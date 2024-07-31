@@ -1,2 +1,2 @@
 # GPU Screen Recorder Notification
-NVIDIA ShadowPlay styled notification.
+Notification in the style of NVIDIA ShadowPlay.
