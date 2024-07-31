@@ -45,10 +45,6 @@ static double min_double(double a, double b) {
     return a < b ? a : b;
 }
 
-static float max_float(float a, float b) {
-    return a > b ? a : b;
-}
-
 #define _NET_WM_STATE_REMOVE  0
 #define _NET_WM_STATE_ADD     1
 #define _NET_WM_STATE_TOGGLE  2
@@ -234,14 +230,14 @@ int main(int argc, char **argv) {
 
     const std::array<StateWithPayload, 9> states_to_execute_in_order = {
         StateWithPayload{State::SLIDE_IN_WINDOW,   0.15},
-        StateWithPayload{State::PAUSE,             0.05},
+        StateWithPayload{State::PAUSE,             0.03},
         StateWithPayload{State::SLIDE_IN_CONTENT,  0.10},
-        StateWithPayload{State::FADE_IN_CONTENT,   0.30},
+        StateWithPayload{State::FADE_IN_CONTENT,   0.20},
         StateWithPayload{State::PAUSE,             notification_timeout_sec},
         StateWithPayload{State::FADE_OUT_CONTENT,  0.001},
-        StateWithPayload{State::SLIDE_OUT_CONTENT, 0.15},
+        StateWithPayload{State::SLIDE_OUT_CONTENT, 0.10},
         StateWithPayload{State::PAUSE,             0.10},
-        StateWithPayload{State::SLIDE_OUT_WINDOW,  0.15},
+        StateWithPayload{State::SLIDE_OUT_WINDOW,  0.10},
     };
     int current_state_index = 0;
 
