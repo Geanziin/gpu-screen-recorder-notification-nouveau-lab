@@ -1,0 +1,3 @@
+[submodule "depends/mglpp"]
+	path = depends/mglpp
+	url = https://repo.dec05eba.com/mglpp.git
