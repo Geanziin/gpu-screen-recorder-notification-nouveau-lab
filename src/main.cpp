@@ -98,14 +98,68 @@ static Bool make_window_sticky(Display* display, Window window) {
     return set_window_wm_state(display, window, net_wm_state_sticky_atom);
 }
 
-int main(int argc, char **argv) {
-    if(argc != 2) {
-        fprintf(stderr, "usage: gpu-screen-recorder-notification <title>\n");
-        exit(1);
+static void usage() {
+    fprintf(stderr, "usage: gpu-screen-recorder-notification <text> <timeout> [icon] [icon-color]\n");
+    fprintf(stderr, "options:\n");
+    fprintf(stderr, "  text        The text to display in the notification. Required.\n");
+    fprintf(stderr, "  timeout     The time to display the notification in seconds (excluding animation time), expected to be a floating point number. Required.\n");
+    fprintf(stderr, "  icon        A path to an image file to display on the left side of the text. Optional.\n");
+    fprintf(stderr, "  icon-color  The color to display the icon as in hex format, for example FF0000. Optional, set to FFFFFF by default.\n");
+    fprintf(stderr, "examples:\n");
+    fprintf(stderr, "  gpu-screen-recorder-notification 'Recording has started' 3.0\n");
+    fprintf(stderr, "  gpu-screen-recorder-notification 'Recording has started' 3.0 '/usr/share/gpu-screen-recorder/images/record.png'\n");
+    fprintf(stderr, "  gpu-screen-recorder-notification 'Recording has started' 3.0 '/usr/share/gpu-screen-recorder/images/record.png' FF0000\n");
+    exit(1);
+}
+
+static int hex_character_to_number(char c) {
+    if(c >= '0' && c <= '9')
+        return c - '0';
+    else if(c >= 'a' && c <= 'f')
+        return 10 + c - 'a';
+    else if(c >= 'A' && c <= 'F')
+        return 10 + c - 'A';
+    else
+        return -1;
+}
+
+static mgl::Color parse_hex_color(const char *str) {
+    const int len = strlen(str);
+    if(len != 6) {
+        fprintf(stderr, "error: expected icon-color to be 6 characters long, was: %d\n", len);
+        usage();
     }
 
+    mgl::Color color;
+    uint8_t *comp = &color.r;
+    for(int i = 0; i < len; i += 2) {
+        const int val1 = hex_character_to_number(str[i + 0]);
+        const int val2 = hex_character_to_number(str[i + 1]);
+        if(val1 == -1 || val2 == -1) {
+            fprintf(stderr, "error: icon-color is an invalid hex color: '%s'\n", str);
+            usage();
+        }
+        comp[i / 2] = (val1 << 4) | val2;
+    }
+    return color;
+}
+
+int main(int argc, char **argv) {
+    if(argc < 3)
+        usage();
+
     const char *notification_title = argv[1];
-    const double notification_timeout_sec = 3.0;
+    const char *timeout_str = argv[2];
+    const char *icon_filepath = argc >= 4 ? argv[3] : nullptr;
+    const char *icon_color_str = argc >= 5 ? argv[4] : nullptr;
+
+    float notification_timeout_sec = 0.0;
+    if(sscanf(timeout_str, "%f", &notification_timeout_sec) != 1) {
+        fprintf(stderr, "error: expected timeout to be a floating point number, was: '%s'\n", timeout_str);
+        usage();
+    }
+
+    const mgl::Color icon_color = parse_hex_color(icon_color_str ? icon_color_str : "FFFFFF");
 
     mgl::Init init;
 
@@ -138,23 +192,32 @@ int main(int argc, char **argv) {
         return 1;
 
     mgl::Texture record_texture;
-    if(!record_texture.load_from_file("images/record.png"))
-        return 1;
+    if(icon_filepath) {
+        if(!record_texture.load_from_file(icon_filepath)) {
+            fprintf(stderr, "error: failed to load icon\n");
+            return 1;
+        }
+    }
 
-    const int window_height = win->monitors[0].size.y / 12;
+    const int window_height = win->monitors[0].size.y / 13;
     const float content_padding_left = 10.0f;//max_float(5.0f, (float)window_size.x / 30.0f);
 
     mgl::Text content_title(notification_title, font);
     content_title.set_color(mgl::Color(255, 255, 255, 0));
 
-    mgl::Sprite content_record_sprite(&record_texture);
-    content_record_sprite.set_color(mgl::Color(118, 185, 0, 0));
-    content_record_sprite.set_height((int)(window_height * 0.4f));
-    const float content_record_sprite_padding_x = (int)((window_height - content_record_sprite.get_size().y) * 0.4f);
-    const float padding_between_icon_and_text_x = (int)(content_record_sprite_padding_x * 0.7f);
+    mgl::Sprite content_record_sprite;
+    float content_record_sprite_padding_x = 20.0f;
+    float padding_between_icon_and_text_x = 0.0f;
+    if(record_texture.is_valid()) {
+        content_record_sprite.set_texture(&record_texture);
+        content_record_sprite.set_color(mgl::Color(icon_color.r, icon_color.g, icon_color.b, 0));
+        content_record_sprite.set_height((int)(window_height * 0.4f));
+        content_record_sprite_padding_x = (int)((window_height - content_record_sprite.get_size().y) * 0.4f);
+        padding_between_icon_and_text_x = (int)(content_record_sprite_padding_x * 0.7f);
+    }
 
     // TODO: Use the monitor that the cursor is on or the focused window is on
-    const int window_width = content_padding_left + content_record_sprite_padding_x + content_record_sprite.get_size().x + padding_between_icon_and_text_x + content_title.get_bounds().size.x + content_record_sprite_padding_x + padding_between_icon_and_text_x + content_padding_left;
+    const int window_width = content_padding_left + content_record_sprite_padding_x + content_record_sprite.get_size().x + padding_between_icon_and_text_x + content_title.get_bounds().size.x + content_record_sprite_padding_x + padding_between_icon_and_text_x;
     const mgl::vec2i window_size{window_width, window_height};
     const mgl::vec2i window_start_position{win->monitors[0].size.x, window_size.y};
     window.set_size_limits(window_size, window_size);
@@ -173,7 +236,7 @@ int main(int argc, char **argv) {
         StateWithPayload{State::SLIDE_IN_WINDOW,   0.15},
         StateWithPayload{State::PAUSE,             0.05},
         StateWithPayload{State::SLIDE_IN_CONTENT,  0.10},
-        StateWithPayload{State::FADE_IN_CONTENT,   0.50},
+        StateWithPayload{State::FADE_IN_CONTENT,   0.30},
         StateWithPayload{State::PAUSE,             notification_timeout_sec},
         StateWithPayload{State::FADE_OUT_CONTENT,  0.001},
         StateWithPayload{State::SLIDE_OUT_CONTENT, 0.15},
@@ -226,13 +289,13 @@ int main(int argc, char **argv) {
             case State::FADE_IN_CONTENT: {
                 double new_alpha = interpolate(content_start_alpha, content_end_alpha, state_interpolation);
                 content_title.set_color(mgl::Color(255, 255, 255, new_alpha * 255.0f));
-                content_record_sprite.set_color(mgl::Color(118, 185, 0, new_alpha * 255.0f));
+                content_record_sprite.set_color(mgl::Color(icon_color.r, icon_color.g, icon_color.b, new_alpha * 255.0f));
                 break;
             }
             case State::FADE_OUT_CONTENT: {
                 double new_alpha = interpolate(content_end_alpha, content_start_alpha, state_interpolation);
                 content_title.set_color(mgl::Color(255, 255, 255, new_alpha * 255.0f));
-                content_record_sprite.set_color(mgl::Color(118, 185, 0, new_alpha * 255.0f));
+                content_record_sprite.set_color(mgl::Color(icon_color.r, icon_color.g, icon_color.b, new_alpha * 255.0f));
                 break;
             }
             case State::SLIDE_OUT_CONTENT: {
