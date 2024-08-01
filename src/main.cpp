@@ -174,7 +174,7 @@ int main(int argc, char **argv) {
     const char *timeout_str = args["--timeout"];
     const char *icon_filepath = args["--icon"];
     const char *icon_color_str = args["--icon-color"];
-    const char *bg_color_str = args["--icon-color"];
+    const char *bg_color_str = args["--bg-color"];
 
     if(!notification_text) {
         fprintf(stderr, "error: missing required option '--text'\n");
