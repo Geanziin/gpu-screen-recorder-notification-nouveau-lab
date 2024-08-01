@@ -187,9 +187,9 @@ int main(int argc, char **argv) {
     if(!font.load_from_file(font_file, win->monitors[0].size.y / 60))
         return 1;
 
-    mgl::Texture record_texture;
+    mgl::Texture logo_texture;
     if(icon_filepath) {
-        if(!record_texture.load_from_file(icon_filepath)) {
+        if(!logo_texture.load_from_file(icon_filepath, {false, false, true})) {
             fprintf(stderr, "error: failed to load icon\n");
             return 1;
         }
@@ -198,22 +198,22 @@ int main(int argc, char **argv) {
     const int window_height = win->monitors[0].size.y / 13;
     const float content_padding_left = 10.0f;//max_float(5.0f, (float)window_size.x / 30.0f);
 
-    mgl::Text content_title(notification_title, font);
-    content_title.set_color(mgl::Color(255, 255, 255, 0));
+    mgl::Text title(notification_title, font);
+    title.set_color(mgl::Color(255, 255, 255, 0));
 
-    mgl::Sprite content_record_sprite;
-    float content_record_sprite_padding_x = 20.0f;
+    mgl::Sprite logo_sprite;
+    float logo_sprite_padding_x = 20.0f;
     float padding_between_icon_and_text_x = 0.0f;
-    if(record_texture.is_valid()) {
-        content_record_sprite.set_texture(&record_texture);
-        content_record_sprite.set_color(mgl::Color(icon_color.r, icon_color.g, icon_color.b, 0));
-        content_record_sprite.set_height((int)(window_height * 0.4f));
-        content_record_sprite_padding_x = (int)((window_height - content_record_sprite.get_size().y) * 0.4f);
-        padding_between_icon_and_text_x = (int)(content_record_sprite_padding_x * 0.7f);
+    if(logo_texture.is_valid()) {
+        logo_sprite.set_texture(&logo_texture);
+        logo_sprite.set_color(mgl::Color(icon_color.r, icon_color.g, icon_color.b, 0));
+        logo_sprite.set_height((int)(window_height * 0.4f));
+        logo_sprite_padding_x = (int)((window_height - logo_sprite.get_size().y) * 0.4f);
+        padding_between_icon_and_text_x = (int)(logo_sprite_padding_x * 0.7f);
     }
 
     // TODO: Use the monitor that the cursor is on or the focused window is on
-    const int window_width = content_padding_left + content_record_sprite_padding_x + content_record_sprite.get_size().x + padding_between_icon_and_text_x + content_title.get_bounds().size.x + content_record_sprite_padding_x + padding_between_icon_and_text_x;
+    const int window_width = content_padding_left + logo_sprite_padding_x + logo_sprite.get_size().x + padding_between_icon_and_text_x + title.get_bounds().size.x + logo_sprite_padding_x + padding_between_icon_and_text_x;
     const mgl::vec2i window_size{window_width, window_height};
     const mgl::vec2i window_start_position{win->monitors[0].size.x, window_size.y};
     window.set_size_limits(window_size, window_size);
@@ -258,10 +258,10 @@ int main(int argc, char **argv) {
     const auto slide_content_handler = [&](double interpolate_start, double interpolate_end, double interpolation) {
         double new_slide_x = interpolate(interpolate_start, interpolate_end, interpolation);
         content_bg.set_position(mgl::vec2f(new_slide_x, content_bg_start_position.y).floor());
-        content_record_sprite.set_position((content_bg.get_position() + mgl::vec2f(content_record_sprite_padding_x, content_bg.get_size().y * 0.5f - content_record_sprite.get_size().y * 0.5f)).floor());
-        const float content_space_left_pos_x = content_record_sprite.get_position().x + content_record_sprite.get_size().x + padding_between_icon_and_text_x;
+        logo_sprite.set_position((content_bg.get_position() + mgl::vec2f(logo_sprite_padding_x, content_bg.get_size().y * 0.5f - logo_sprite.get_size().y * 0.5f)).floor());
+        const float content_space_left_pos_x = logo_sprite.get_position().x + logo_sprite.get_size().x + padding_between_icon_and_text_x;
         //const float content_space_left_x = content_bg.get_size().x - content_space_left_pos_x;
-        content_title.set_position((mgl::vec2f(content_space_left_pos_x, content_bg.get_position().y) + mgl::vec2f(0.0f, content_bg.get_size().y) * 0.5f - mgl::vec2f(0.0f, content_title.get_bounds().size.y) * 0.5f).floor());
+        title.set_position((mgl::vec2f(content_space_left_pos_x, content_bg.get_position().y) + mgl::vec2f(0.0f, content_bg.get_size().y) * 0.5f - mgl::vec2f(0.0f, title.get_bounds().size.y) * 0.5f).floor());
     };
 
     mgl::Event event;
@@ -284,14 +284,14 @@ int main(int argc, char **argv) {
             }
             case State::FADE_IN_CONTENT: {
                 double new_alpha = interpolate(content_start_alpha, content_end_alpha, state_interpolation);
-                content_title.set_color(mgl::Color(255, 255, 255, new_alpha * 255.0f));
-                content_record_sprite.set_color(mgl::Color(icon_color.r, icon_color.g, icon_color.b, new_alpha * 255.0f));
+                title.set_color(mgl::Color(255, 255, 255, new_alpha * 255.0f));
+                logo_sprite.set_color(mgl::Color(icon_color.r, icon_color.g, icon_color.b, new_alpha * 255.0f));
                 break;
             }
             case State::FADE_OUT_CONTENT: {
                 double new_alpha = interpolate(content_end_alpha, content_start_alpha, state_interpolation);
-                content_title.set_color(mgl::Color(255, 255, 255, new_alpha * 255.0f));
-                content_record_sprite.set_color(mgl::Color(icon_color.r, icon_color.g, icon_color.b, new_alpha * 255.0f));
+                title.set_color(mgl::Color(255, 255, 255, new_alpha * 255.0f));
+                logo_sprite.set_color(mgl::Color(icon_color.r, icon_color.g, icon_color.b, new_alpha * 255.0f));
                 break;
             }
             case State::SLIDE_OUT_CONTENT: {
@@ -310,8 +310,8 @@ int main(int argc, char **argv) {
 
         window.clear(bg_color);
         window.draw(content_bg);
-        window.draw(content_record_sprite);
-        window.draw(content_title);
+        window.draw(logo_sprite);
+        window.draw(title);
         window.display();
 
         if(state_interpolation >= 1.0) {
