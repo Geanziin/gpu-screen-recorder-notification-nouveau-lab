@@ -94,7 +94,7 @@ static Bool make_window_sticky(Display* display, Window window) {
 }
 
 static void usage() {
-    fprintf(stderr, "usage: gpu-screen-recorder-notification <--text text> <--timeout timeout> [--icon filepath] [--icon-color color]\n");
+    fprintf(stderr, "usage: gpu-screen-recorder-notification <--text text> <--timeout timeout> [--icon filepath] [--icon-color color] [--bg-color color]\n");
     fprintf(stderr, "options:\n");
     fprintf(stderr, "  --text        The text to display in the notification. Required.\n");
     fprintf(stderr, "  --timeout     The time to display the notification in seconds (excluding animation time), expected to be a floating point number. Required.\n");
