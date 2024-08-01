@@ -12,14 +12,13 @@
 #include <stdio.h>
 #include <string.h>
 #include <array>
+#include <map>
 
 #include <X11/Xlib.h>
 
 extern "C" {
 #include <mgl/mgl.h>
 }
-
-static const mgl::Color bg_color(118, 185, 0);
 
 enum class State {
     SLIDE_IN_WINDOW,
@@ -95,16 +94,17 @@ static Bool make_window_sticky(Display* display, Window window) {
 }
 
 static void usage() {
-    fprintf(stderr, "usage: gpu-screen-recorder-notification <text> <timeout> [icon] [icon-color]\n");
+    fprintf(stderr, "usage: gpu-screen-recorder-notification <--text text> <--timeout timeout> [--icon filepath] [--icon-color color]\n");
     fprintf(stderr, "options:\n");
-    fprintf(stderr, "  text        The text to display in the notification. Required.\n");
-    fprintf(stderr, "  timeout     The time to display the notification in seconds (excluding animation time), expected to be a floating point number. Required.\n");
-    fprintf(stderr, "  icon        A path to an image file to display on the left side of the text. Optional.\n");
-    fprintf(stderr, "  icon-color  The color to display the icon as in hex format, for example FF0000. Optional, set to FFFFFF by default.\n");
+    fprintf(stderr, "  --text        The text to display in the notification. Required.\n");
+    fprintf(stderr, "  --timeout     The time to display the notification in seconds (excluding animation time), expected to be a floating point number. Required.\n");
+    fprintf(stderr, "  --icon        A path to an image file to display on the left side of the text. Optional.\n");
+    fprintf(stderr, "  --icon-color  The color to display the icon as in hex format, for example FF0000. Optional, set to FFFFFF by default.\n");
+    fprintf(stderr, "  --bg-color    The notification background (and side bar) color in hex format, for example FF0000. Optional, set to 76b900 by default.\n");
     fprintf(stderr, "examples:\n");
-    fprintf(stderr, "  gpu-screen-recorder-notification 'Recording has started' 3.0\n");
-    fprintf(stderr, "  gpu-screen-recorder-notification 'Recording has started' 3.0 '/usr/share/gpu-screen-recorder/images/record.png'\n");
-    fprintf(stderr, "  gpu-screen-recorder-notification 'Recording has started' 3.0 '/usr/share/gpu-screen-recorder/images/record.png' FF0000\n");
+    fprintf(stderr, "  gpu-screen-recorder-notification --text 'Recording has started' --timeout 3.0\n");
+    fprintf(stderr, "  gpu-screen-recorder-notification --text 'Recording has started' --timeout 3.0 --icon '/usr/share/gpu-screen-recorder/images/record.png'\n");
+    fprintf(stderr, "  gpu-screen-recorder-notification --text 'Recording has started' --timeout 3.0 --icon '/usr/share/gpu-screen-recorder/images/record.png' --icon-color FF0000\n");
     exit(1);
 }
 
@@ -141,13 +141,50 @@ static mgl::Color parse_hex_color(const char *str) {
 }
 
 int main(int argc, char **argv) {
-    if(argc < 3)
+    if(argc == 1)
         usage();
 
-    const char *notification_title = argv[1];
-    const char *timeout_str = argv[2];
-    const char *icon_filepath = argc >= 4 ? argv[3] : nullptr;
-    const char *icon_color_str = argc >= 5 ? argv[4] : nullptr;
+    if(argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0))
+        usage();
+
+    std::map<std::string, const char*> args = {
+        {"--text", nullptr},
+        {"--timeout", nullptr},
+        {"--icon", nullptr},
+        {"--icon-color", nullptr},
+        {"--bg-color", nullptr},
+    };
+
+    for(int i = 1; i < argc; i += 2) {
+        auto it = args.find(argv[i]);
+        if(it == args.end()) {
+            fprintf(stderr, "error: invalid option '%s'\n", argv[i]);
+            usage();
+        }
+
+        if(i + 1 >= argc) {
+            fprintf(stderr, "error: missing value after option '%s'\n", argv[i]);
+            usage();
+        }
+
+        it->second = argv[i + 1];
+    }
+
+    const char *notification_text = args["--text"];
+    const char *timeout_str = args["--timeout"];
+    const char *icon_filepath = args["--icon"];
+    const char *icon_color_str = args["--icon-color"];
+    const char *bg_color_str = args["--icon-color"];
+
+    if(!notification_text) {
+        fprintf(stderr, "error: missing required option '--text'\n");
+        usage();
+    }
+
+    if(!timeout_str) {
+        fprintf(stderr, "error: missing required option '--timeout'\n");
+        usage();
+    }
 
     float notification_timeout_sec = 0.0;
     if(sscanf(timeout_str, "%f", &notification_timeout_sec) != 1) {
@@ -156,6 +193,7 @@ int main(int argc, char **argv) {
     }
 
     const mgl::Color icon_color = parse_hex_color(icon_color_str ? icon_color_str : "FFFFFF");
+    const mgl::Color bg_color = parse_hex_color(bg_color_str ? bg_color_str : "76b900");
 
     mgl::Init init;
 
@@ -198,8 +236,8 @@ int main(int argc, char **argv) {
     const int window_height = win->monitors[0].size.y / 13;
     const float content_padding_left = 10.0f;//max_float(5.0f, (float)window_size.x / 30.0f);
 
-    mgl::Text title(notification_title, font);
-    title.set_color(mgl::Color(255, 255, 255, 0));
+    mgl::Text text(notification_text, font);
+    text.set_color(mgl::Color(255, 255, 255, 0));
 
     mgl::Sprite logo_sprite;
     float logo_sprite_padding_x = 20.0f;
@@ -213,7 +251,7 @@ int main(int argc, char **argv) {
     }
 
     // TODO: Use the monitor that the cursor is on or the focused window is on
-    const int window_width = content_padding_left + logo_sprite_padding_x + logo_sprite.get_size().x + padding_between_icon_and_text_x + title.get_bounds().size.x + logo_sprite_padding_x + padding_between_icon_and_text_x;
+    const int window_width = content_padding_left + logo_sprite_padding_x + logo_sprite.get_size().x + padding_between_icon_and_text_x + text.get_bounds().size.x + logo_sprite_padding_x + padding_between_icon_and_text_x;
     const mgl::vec2i window_size{window_width, window_height};
     const mgl::vec2i window_start_position{win->monitors[0].size.x, window_size.y};
     window.set_size_limits(window_size, window_size);
@@ -261,7 +299,7 @@ int main(int argc, char **argv) {
         logo_sprite.set_position((content_bg.get_position() + mgl::vec2f(logo_sprite_padding_x, content_bg.get_size().y * 0.5f - logo_sprite.get_size().y * 0.5f)).floor());
         const float content_space_left_pos_x = logo_sprite.get_position().x + logo_sprite.get_size().x + padding_between_icon_and_text_x;
         //const float content_space_left_x = content_bg.get_size().x - content_space_left_pos_x;
-        title.set_position((mgl::vec2f(content_space_left_pos_x, content_bg.get_position().y) + mgl::vec2f(0.0f, content_bg.get_size().y) * 0.5f - mgl::vec2f(0.0f, title.get_bounds().size.y) * 0.5f).floor());
+        text.set_position((mgl::vec2f(content_space_left_pos_x, content_bg.get_position().y) + mgl::vec2f(0.0f, content_bg.get_size().y) * 0.5f - mgl::vec2f(0.0f, text.get_bounds().size.y) * 0.5f).floor());
     };
 
     mgl::Event event;
@@ -284,13 +322,13 @@ int main(int argc, char **argv) {
             }
             case State::FADE_IN_CONTENT: {
                 double new_alpha = interpolate(content_start_alpha, content_end_alpha, state_interpolation);
-                title.set_color(mgl::Color(255, 255, 255, new_alpha * 255.0f));
+                text.set_color(mgl::Color(255, 255, 255, new_alpha * 255.0f));
                 logo_sprite.set_color(mgl::Color(icon_color.r, icon_color.g, icon_color.b, new_alpha * 255.0f));
                 break;
             }
             case State::FADE_OUT_CONTENT: {
                 double new_alpha = interpolate(content_end_alpha, content_start_alpha, state_interpolation);
-                title.set_color(mgl::Color(255, 255, 255, new_alpha * 255.0f));
+                text.set_color(mgl::Color(255, 255, 255, new_alpha * 255.0f));
                 logo_sprite.set_color(mgl::Color(icon_color.r, icon_color.g, icon_color.b, new_alpha * 255.0f));
                 break;
             }
@@ -311,7 +349,7 @@ int main(int argc, char **argv) {
         window.clear(bg_color);
         window.draw(content_bg);
         window.draw(logo_sprite);
-        window.draw(title);
+        window.draw(text);
         window.display();
 
         if(state_interpolation >= 1.0) {
