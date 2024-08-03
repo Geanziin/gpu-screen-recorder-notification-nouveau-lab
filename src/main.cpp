@@ -73,16 +73,6 @@ static Bool set_window_wm_state(Display *display, Window window, Atom atom) {
     return True;
 }
 
-static Bool make_window_always_on_top(Display* display, Window window) {
-    Atom net_wm_state_above_atom = XInternAtom(display, "_NET_WM_STATE_ABOVE", False);
-    if(!net_wm_state_above_atom) {
-        fprintf(stderr, "Error: failed to find atom _NET_WM_STATE_ABOVE\n");
-        return False;
-    }
-    
-    return set_window_wm_state(display, window, net_wm_state_above_atom);
-}
-
 static Bool make_window_sticky(Display* display, Window window) {
     Atom net_wm_state_sticky_atom = XInternAtom(display, "_NET_WM_STATE_STICKY", False);
     if(!net_wm_state_sticky_atom) {
@@ -262,7 +252,6 @@ int main(int argc, char **argv) {
     window.set_visible(true);
 
     Display *display = (Display*)mgl_get_context()->connection;
-    make_window_always_on_top(display, window.get_system_handle());
     make_window_sticky(display, window.get_system_handle());
 
     const int slide_window_start_x = win->monitors[0].size.x;
