@@ -205,7 +205,7 @@ int main(int argc, char **argv) {
     window_create_params.override_redirect = true;
     window_create_params.background_color = bg_color;
     window_create_params.hide_decorations = true;
-    window_create_params.window_type = MGL_WINDOW_TYPE_DIALOG;
+    window_create_params.window_type = MGL_WINDOW_TYPE_NOTIFICATION;
 
     mgl::Window window;
     if(!window.create("GPU Screen Recorder Notification", window_create_params))
@@ -250,7 +250,9 @@ int main(int argc, char **argv) {
         padding_between_icon_and_text_x = (int)(logo_sprite_padding_x * 0.7f);
     }
 
-    // TODO: Use the monitor that the cursor is on or the focused window is on
+    // TODO: Use the monitor that the cursor is on or the focused window is on.
+    // TODO: Update position when workspace changes (in dwm, sticky property handles it in real workspaces).
+    // TODO: Make sure the notification always stays on top. Test with starting the notification and then opening youtube in fullscreen.
     const int window_width = content_padding_left + logo_sprite_padding_x + logo_sprite.get_size().x + padding_between_icon_and_text_x + text.get_bounds().size.x + logo_sprite_padding_x + padding_between_icon_and_text_x;
     const mgl::vec2i window_size{window_width, window_height};
     const mgl::vec2i window_start_position{win->monitors[0].size.x, window_size.y};
