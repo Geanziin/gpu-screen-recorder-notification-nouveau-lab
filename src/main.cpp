@@ -13,6 +13,7 @@
 #include <string.h>
 #include <array>
 #include <map>
+#include <assert.h>
 
 #include <X11/Xlib.h>
 #include <X11/extensions/Xfixes.h>
@@ -140,6 +141,18 @@ static mgl::Color parse_hex_color(const char *str) {
     return color;
 }
 
+// Returns the first monitor if not found. Assumes there is at least one monitor connected.
+static const mgl_monitor* find_monitor_by_cursor_position(mgl::Window &window) {
+    const mgl_window *win = window.internal_window();
+    assert(win->num_monitors > 0);
+    for(int i = 0; i < win->num_monitors; ++i) {
+        const mgl_monitor *mon = &win->monitors[i];
+        if(mgl::IntRect({ mon->pos.x, mon->pos.y }, { mon->size.x, mon->size.y }).contains({ win->cursor_position.x, win->cursor_position.y }))
+            return mon;
+    }
+    return &win->monitors[0];
+}
+
 int main(int argc, char **argv) {
     if(argc == 1)
         usage();
@@ -217,12 +230,14 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
+    const mgl_monitor *focused_monitor = find_monitor_by_cursor_position(window);
+
     mgl::MemoryMappedFile font_file;
     if(!font_file.load("/usr/share/fonts/noto/NotoSans-Bold.ttf", mgl::MemoryMappedFile::LoadOptions{true, false}))
         return 1;
 
     mgl::Font font;
-    if(!font.load_from_file(font_file, win->monitors[0].size.y / 60))
+    if(!font.load_from_file(font_file, focused_monitor->size.y / 60))
         return 1;
 
     mgl::Texture logo_texture;
@@ -232,8 +247,10 @@ int main(int argc, char **argv) {
         }
     }
 
-    const int window_height = win->monitors[0].size.y / 13;
-    const float content_padding_left = 10.0f;//max_float(5.0f, (float)window_size.x / 30.0f);
+    const int window_height = focused_monitor->size.y / 13;
+    float content_padding_left = (int)(window_height * 0.05f);
+    if(content_padding_left < 2.0f)
+        content_padding_left = 2.0f;
 
     mgl::Text text(notification_text, font);
     text.set_color(mgl::Color(255, 255, 255, 0));
@@ -256,7 +273,7 @@ int main(int argc, char **argv) {
     // TODO: Make sure the notification always stays on top. Test with starting the notification and then opening youtube in fullscreen.
     const int window_width = content_padding_left + logo_sprite_padding_x + logo_sprite.get_size().x + padding_between_icon_and_text_x + text.get_bounds().size.x + logo_sprite_padding_x + padding_between_icon_and_text_x;
     const mgl::vec2i window_size{window_width, window_height};
-    const mgl::vec2i window_start_position{win->monitors[0].size.x, window_size.y};
+    const mgl::vec2i window_start_position{focused_monitor->pos.x + focused_monitor->size.x, focused_monitor->pos.y + window_size.y};
     window.set_size_limits(window_size, window_size);
     window.set_size(window_size);
     window.set_position(window_start_position);
@@ -264,8 +281,8 @@ int main(int argc, char **argv) {
     window.set_visible(true);
     make_window_sticky(display, window.get_system_handle());
 
-    const int slide_window_start_x = win->monitors[0].size.x;
-    const int slide_window_end_x = win->monitors[0].size.x - window_size.x;
+    const int slide_window_start_x = focused_monitor->pos.x + focused_monitor->size.x;
+    const int slide_window_end_x = focused_monitor->pos.x + focused_monitor->size.x - window_size.x;
 
     const std::array<StateWithPayload, 9> states_to_execute_in_order = {
         StateWithPayload{State::SLIDE_IN_WINDOW,   0.15},
