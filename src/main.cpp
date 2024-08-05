@@ -228,8 +228,7 @@ int main(int argc, char **argv) {
     mgl::Texture logo_texture;
     if(icon_filepath) {
         if(!logo_texture.load_from_file(icon_filepath, {false, false, true})) {
-            fprintf(stderr, "error: failed to load icon\n");
-            return 1;
+            fprintf(stderr, "Warning: failed to load icon\n");
         }
     }
 
