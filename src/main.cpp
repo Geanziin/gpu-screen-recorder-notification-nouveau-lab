@@ -213,7 +213,7 @@ int main(int argc, char **argv) {
     mgl::Window::CreateParams window_create_params;
     window_create_params.size = { 1280, 720 };
     window_create_params.min_size = window_create_params.size;
-    window_create_params.max_size = window_create_params.max_size;
+    window_create_params.max_size = window_create_params.size;
     window_create_params.hidden = true;
     window_create_params.override_redirect = true;
     window_create_params.background_color = bg_color;
