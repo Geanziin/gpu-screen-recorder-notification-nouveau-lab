@@ -268,8 +268,6 @@ int main(int argc, char **argv) {
 
     Display *display = (Display*)mgl_get_context()->connection;
 
-    // TODO: Use the monitor that the cursor is on or the focused window is on.
-    // TODO: Update position when workspace changes (in dwm, sticky property handles it in real workspaces).
     // TODO: Make sure the notification always stays on top. Test with starting the notification and then opening youtube in fullscreen.
     const int window_width = content_padding_left + logo_sprite_padding_x + logo_sprite.get_size().x + padding_between_icon_and_text_x + text.get_bounds().size.x + logo_sprite_padding_x + padding_between_icon_and_text_x;
     const mgl::vec2i window_size{window_width, window_height};
