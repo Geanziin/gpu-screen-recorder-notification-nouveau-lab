@@ -15,6 +15,8 @@
 #include <map>
 
 #include <X11/Xlib.h>
+#include <X11/extensions/Xfixes.h>
+#include <X11/extensions/shape.h>
 
 extern "C" {
 #include <mgl/mgl.h>
@@ -81,6 +83,14 @@ static Bool make_window_sticky(Display* display, Window window) {
     }
     
     return set_window_wm_state(display, window, net_wm_state_sticky_atom);
+}
+
+static void make_window_click_through(Display *display, Window window) {
+    XRectangle rect;
+    memset(&rect, 0, sizeof(rect));
+    XserverRegion region = XFixesCreateRegion(display, &rect, 1);
+    XFixesSetWindowShapeRegion(display, window, ShapeInput, 0, 0, region);
+    XFixesDestroyRegion(display, region);
 }
 
 static void usage() {
@@ -240,6 +250,8 @@ int main(int argc, char **argv) {
         padding_between_icon_and_text_x = (int)(logo_sprite_padding_x * 0.7f);
     }
 
+    Display *display = (Display*)mgl_get_context()->connection;
+
     // TODO: Use the monitor that the cursor is on or the focused window is on.
     // TODO: Update position when workspace changes (in dwm, sticky property handles it in real workspaces).
     // TODO: Make sure the notification always stays on top. Test with starting the notification and then opening youtube in fullscreen.
@@ -249,9 +261,8 @@ int main(int argc, char **argv) {
     window.set_size_limits(window_size, window_size);
     window.set_size(window_size);
     window.set_position(window_start_position);
+    make_window_click_through(display, window.get_system_handle());
     window.set_visible(true);
-
-    Display *display = (Display*)mgl_get_context()->connection;
     make_window_sticky(display, window.get_system_handle());
 
     const int slide_window_start_x = win->monitors[0].size.x;
