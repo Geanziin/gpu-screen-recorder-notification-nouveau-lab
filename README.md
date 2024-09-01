@@ -14,4 +14,4 @@ These are the dependencies needed to build GPU Screen Recorder Notification:
 Run `sudo ./install.sh`. This will install gsr-notify to `/usr/bin/gsr-notify`. You can run meson commands manually to install gsr-notify to another directory.
 
 # License
-This software is licensed under GPL3.0-only. `fonts/NotoSans-Bold.ttf` is licensed under the `SIL Open Font License` license.
+This software is licensed under GPL3.0-only. `fonts/NotoSans-Bold.ttf` is licensed under `SIL Open Font License`.
