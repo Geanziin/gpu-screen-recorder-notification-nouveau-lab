@@ -1,5 +1,5 @@
 # GPU Screen Recorder Notification
-Notification in the style of NVIDIA ShadowPlay.
+Notification in the style of ShadowPlay.
 
 # Dependencies
 x11, xrandr, xrender, xfixes, opengl
