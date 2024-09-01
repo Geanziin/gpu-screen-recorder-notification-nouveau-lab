@@ -18,9 +18,16 @@ dep = [
     dependency('xfixes'),
 ]
 
+prefix = get_option('prefix')
+datadir = get_option('datadir')
+gsr_notify_resources_path = join_paths(prefix, datadir, 'gsr-notify')
+
 executable(
     meson.project_name(),
     src,
     install : true,
     dependencies : dep,
+    cpp_args : '-DGSR_NOTIFY_RESOURCES_PATH="' + gsr_notify_resources_path + '"',
 )
+
+install_subdir('images', install_dir : gsr_notify_resources_path)

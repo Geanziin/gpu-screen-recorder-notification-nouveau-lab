@@ -14,6 +14,7 @@
 #include <array>
 #include <map>
 #include <assert.h>
+#include <unistd.h>
 
 #include <X11/Xlib.h>
 #include <X11/extensions/Xfixes.h>
@@ -94,18 +95,19 @@ static void make_window_click_through(Display *display, Window window) {
     XFixesDestroyRegion(display, region);
 }
 
-static void usage() {
-    fprintf(stderr, "usage: gpu-screen-recorder-notification <--text text> <--timeout timeout> [--icon filepath] [--icon-color color] [--bg-color color]\n");
+static void usage(const std::string &resources_path) {
+    fprintf(stderr, "usage: gsr-notify <--text text> <--timeout timeout> [--icon filepath] [--icon-color color] [--bg-color color]\n");
     fprintf(stderr, "options:\n");
     fprintf(stderr, "  --text        The text to display in the notification. Required.\n");
     fprintf(stderr, "  --timeout     The time to display the notification in seconds (excluding animation time), expected to be a floating point number. Required.\n");
-    fprintf(stderr, "  --icon        A path to an image file to display on the left side of the text. Optional.\n");
+    fprintf(stderr, "  --icon        A path to an image file to display on the left side of the text. This can also be the name of a file in \"%simages\" without the extension. Optional.\n", resources_path.c_str());
     fprintf(stderr, "  --icon-color  The color to display the icon as in hex format, for example FF0000. Optional, set to FFFFFF by default.\n");
     fprintf(stderr, "  --bg-color    The notification background (and side bar) color in hex format, for example FF0000. Optional, set to 76b900 by default.\n");
     fprintf(stderr, "examples:\n");
-    fprintf(stderr, "  gpu-screen-recorder-notification --text 'Recording has started' --timeout 3.0\n");
-    fprintf(stderr, "  gpu-screen-recorder-notification --text 'Recording has started' --timeout 3.0 --icon '/usr/share/gpu-screen-recorder/images/record.png'\n");
-    fprintf(stderr, "  gpu-screen-recorder-notification --text 'Recording has started' --timeout 3.0 --icon '/usr/share/gpu-screen-recorder/images/record.png' --icon-color FF0000\n");
+    fprintf(stderr, "  gsr-notify --text 'Recording has started' --timeout 3.0\n");
+    fprintf(stderr, "  gsr-notify --text 'Recording has started' --timeout 3.0 --icon record\n");
+    fprintf(stderr, "  gsr-notify --text 'Recording has started' --timeout 3.0 --icon '/usr/share/gpu-screen-recorder/images/record.png'\n");
+    fprintf(stderr, "  gsr-notify --text 'Recording has started' --timeout 3.0 --icon '/usr/share/gpu-screen-recorder/images/record.png' --icon-color FF0000\n");
     exit(1);
 }
 
@@ -120,11 +122,11 @@ static int hex_character_to_number(char c) {
         return -1;
 }
 
-static mgl::Color parse_hex_color(const char *str) {
+static mgl::Color parse_hex_color(const char *str, const std::string &resources_path) {
     const int len = strlen(str);
     if(len != 6) {
         fprintf(stderr, "error: expected icon-color to be 6 characters long, was: %d\n", len);
-        usage();
+        usage(resources_path);
     }
 
     mgl::Color color;
@@ -134,7 +136,7 @@ static mgl::Color parse_hex_color(const char *str) {
         const int val2 = hex_character_to_number(str[i + 1]);
         if(val1 == -1 || val2 == -1) {
             fprintf(stderr, "error: icon-color is an invalid hex color: '%s'\n", str);
-            usage();
+            usage(resources_path);
         }
         comp[i / 2] = (val1 << 4) | val2;
     }
@@ -154,11 +156,22 @@ static const mgl_monitor* find_monitor_by_cursor_position(mgl::Window &window) {
 }
 
 int main(int argc, char **argv) {
+    std::string resources_path;
+    if(access("images/stream.png", F_OK) == 0) {
+        resources_path = "./";
+    } else {
+#ifdef GSR_NOTIFY_RESOURCES_PATH
+        resources_path = GSR_NOTIFY_RESOURCES_PATH "/";
+#else
+        resources_path = "/usr/share/gsr-notify/";
+#endif
+    }
+
     if(argc == 1)
-        usage();
+        usage(resources_path);
 
     if(argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0))
-        usage();
+        usage(resources_path);
 
     std::map<std::string, const char*> args = {
         {"--text", nullptr},
@@ -172,12 +185,12 @@ int main(int argc, char **argv) {
         auto it = args.find(argv[i]);
         if(it == args.end()) {
             fprintf(stderr, "error: invalid option '%s'\n", argv[i]);
-            usage();
+            usage(resources_path);
         }
 
         if(i + 1 >= argc) {
             fprintf(stderr, "error: missing value after option '%s'\n", argv[i]);
-            usage();
+            usage(resources_path);
         }
 
         it->second = argv[i + 1];
@@ -191,22 +204,22 @@ int main(int argc, char **argv) {
 
     if(!notification_text) {
         fprintf(stderr, "error: missing required option '--text'\n");
-        usage();
+        usage(resources_path);
     }
 
     if(!timeout_str) {
         fprintf(stderr, "error: missing required option '--timeout'\n");
-        usage();
+        usage(resources_path);
     }
 
     float notification_timeout_sec = 0.0;
     if(sscanf(timeout_str, "%f", &notification_timeout_sec) != 1) {
         fprintf(stderr, "error: expected timeout to be a floating point number, was: '%s'\n", timeout_str);
-        usage();
+        usage(resources_path);
     }
 
-    const mgl::Color icon_color = parse_hex_color(icon_color_str ? icon_color_str : "FFFFFF");
-    const mgl::Color bg_color = parse_hex_color(bg_color_str ? bg_color_str : "76b900");
+    const mgl::Color icon_color = parse_hex_color(icon_color_str ? icon_color_str : "FFFFFF", resources_path);
+    const mgl::Color bg_color = parse_hex_color(bg_color_str ? bg_color_str : "76b900", resources_path);
 
     mgl::Init init;
 
@@ -242,7 +255,15 @@ int main(int argc, char **argv) {
 
     mgl::Texture logo_texture;
     if(icon_filepath) {
-        if(!logo_texture.load_from_file(icon_filepath, {false, false, true})) {
+        std::string icon_filepath_str = icon_filepath;
+        if(icon_filepath_str == "record")
+            icon_filepath_str = resources_path + "images/record.png";
+        else if(icon_filepath_str == "replay")
+            icon_filepath_str = resources_path + "images/replay.png";
+        else if(icon_filepath_str == "stream")
+            icon_filepath_str = resources_path + "images/stream.png";
+
+        if(!logo_texture.load_from_file(icon_filepath_str.c_str(), {false, false, true})) {
             fprintf(stderr, "Warning: failed to load icon\n");
         }
     }
