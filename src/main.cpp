@@ -156,17 +156,6 @@ static const mgl_monitor* find_monitor_by_cursor_position(mgl::Window &window) {
     return &win->monitors[0];
 }
 
-static std::string find_noto_font_filepath(const char *filename) {
-    const char *directories[] = { "/usr/share/fonts/noto", "/usr/share/fonts/truetype/noto" };
-    char filepath[PATH_MAX];
-    for(const char *directory : directories) {
-        snprintf(filepath, sizeof(filepath), "%s/%s", directory, filename);
-        if(access(filepath, F_OK) == 0)
-            return filepath;
-    }
-    return "";
-}
-
 int main(int argc, char **argv) {
     std::string resources_path;
     if(access("images/stream.png", F_OK) == 0) {
@@ -233,12 +222,6 @@ int main(int argc, char **argv) {
     const mgl::Color icon_color = parse_hex_color(icon_color_str ? icon_color_str : "FFFFFF", resources_path);
     const mgl::Color bg_color = parse_hex_color(bg_color_str ? bg_color_str : "76b900", resources_path);
 
-    const std::string noto_sans_bold_filepath = find_noto_font_filepath("NotoSans-Bold.ttf");
-    if(noto_sans_bold_filepath.empty()) {
-        fprintf(stderr, "error: failed to find NotoSans-Bold.ttf. Make sure noto fonts are installed on your system\n");
-        exit(2);
-    }
-
     mgl::Init init;
 
     mgl::Window::CreateParams window_create_params;
@@ -263,6 +246,7 @@ int main(int argc, char **argv) {
 
     const mgl_monitor *focused_monitor = find_monitor_by_cursor_position(window);
 
+    const std::string noto_sans_bold_filepath = resources_path + "fonts/NotoSans-Bold.ttf";
     mgl::MemoryMappedFile font_file;
     if(!font_file.load(noto_sans_bold_filepath.c_str(), mgl::MemoryMappedFile::LoadOptions{true, false}))
         return 1;

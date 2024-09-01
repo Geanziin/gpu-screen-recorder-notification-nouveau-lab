@@ -10,10 +10,8 @@ These are the dependencies needed to build GPU Screen Recorder Notification:
 * x11 (libx11, libxrandr, libxrender, libxfixes)
 * libglvnd (which provides libgl, libglx and libegl)
 
-## Runtime dependencies
-There are also additional dependencies needed at runtime:
-
-* Noto fonts
-
 # Installation
 Run `sudo ./install.sh`. This will install gsr-notify to `/usr/bin/gsr-notify`. You can run meson commands manually to install gsr-notify to another directory.
+
+# License
+This software is licensed under GPL3.0-only. `fonts/NotoSans-Bold.ttf` is licensed under the `SIL Open Font License` license.

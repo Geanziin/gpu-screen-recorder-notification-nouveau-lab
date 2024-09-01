@@ -31,3 +31,4 @@ executable(
 )
 
 install_subdir('images', install_dir : gsr_notify_resources_path)
+install_subdir('fonts', install_dir : gsr_notify_resources_path)
