@@ -15,3 +15,6 @@ Run `sudo ./install.sh`. This will install gsr-notify to `/usr/bin/gsr-notify`. 
 
 # License
 This software is licensed under GPL3.0-only. `fonts/NotoSans-Bold.ttf` is licensed under `SIL Open Font License`.
+
+# Screenshots
+![](https://dec05eba.com/images/gsr-notify-screenshot.png)
