@@ -2,7 +2,7 @@
 Notification in the style of ShadowPlay.
 
 # Dependencies
-GPU Screen Recorder overlay uses meson build system so you need to install `meson` to build GPU Screen Recorder overlay.
+GPU Screen Recorder overlay uses meson build system so you need to install `meson` to build GPU Screen Recorder notification.
 
 ## Build dependencies
 These are the dependencies needed to build GPU Screen Recorder Notification:
