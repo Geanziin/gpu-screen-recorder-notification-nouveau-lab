@@ -96,12 +96,12 @@ static void make_window_click_through(Display *display, Window window) {
     XFixesDestroyRegion(display, region);
 }
 
-static void usage(const std::string &resources_path) {
+static void usage() {
     fprintf(stderr, "usage: gsr-notify <--text text> <--timeout timeout> [--icon filepath] [--icon-color color] [--bg-color color]\n");
     fprintf(stderr, "options:\n");
     fprintf(stderr, "  --text        The text to display in the notification. Required.\n");
     fprintf(stderr, "  --timeout     The time to display the notification in seconds (excluding animation time), expected to be a floating point number. Required.\n");
-    fprintf(stderr, "  --icon        A path to an image file to display on the left side of the text. This can also be the name of a file in \"%simages\" without the extension. Optional.\n", resources_path.c_str());
+    fprintf(stderr, "  --icon        A path to an image file to display on the left side of the text. This can also be either \"record\", \"replay\" or \"stream\" to use built-in images. Optional.\n");
     fprintf(stderr, "  --icon-color  The color to display the icon as in hex format, for example FF0000. Optional, set to FFFFFF by default.\n");
     fprintf(stderr, "  --bg-color    The notification background (and side bar) color in hex format, for example FF0000. Optional, set to 76b900 by default.\n");
     fprintf(stderr, "examples:\n");
@@ -123,11 +123,11 @@ static int hex_character_to_number(char c) {
         return -1;
 }
 
-static mgl::Color parse_hex_color(const char *str, const std::string &resources_path) {
+static mgl::Color parse_hex_color(const char *str) {
     const int len = strlen(str);
     if(len != 6) {
         fprintf(stderr, "error: expected icon-color to be 6 characters long, was: %d\n", len);
-        usage(resources_path);
+        usage();
     }
 
     mgl::Color color;
@@ -137,7 +137,7 @@ static mgl::Color parse_hex_color(const char *str, const std::string &resources_
         const int val2 = hex_character_to_number(str[i + 1]);
         if(val1 == -1 || val2 == -1) {
             fprintf(stderr, "error: icon-color is an invalid hex color: '%s'\n", str);
-            usage(resources_path);
+            usage();
         }
         comp[i / 2] = (val1 << 4) | val2;
     }
@@ -169,10 +169,10 @@ int main(int argc, char **argv) {
     }
 
     if(argc == 1)
-        usage(resources_path);
+        usage();
 
     if(argc == 2 && (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0))
-        usage(resources_path);
+        usage();
 
     std::map<std::string, const char*> args = {
         {"--text", nullptr},
@@ -186,12 +186,12 @@ int main(int argc, char **argv) {
         auto it = args.find(argv[i]);
         if(it == args.end()) {
             fprintf(stderr, "error: invalid option '%s'\n", argv[i]);
-            usage(resources_path);
+            usage();
         }
 
         if(i + 1 >= argc) {
             fprintf(stderr, "error: missing value after option '%s'\n", argv[i]);
-            usage(resources_path);
+            usage();
         }
 
         it->second = argv[i + 1];
@@ -205,22 +205,22 @@ int main(int argc, char **argv) {
 
     if(!notification_text) {
         fprintf(stderr, "error: missing required option '--text'\n");
-        usage(resources_path);
+        usage();
     }
 
     if(!timeout_str) {
         fprintf(stderr, "error: missing required option '--timeout'\n");
-        usage(resources_path);
+        usage();
     }
 
     float notification_timeout_sec = 0.0;
     if(sscanf(timeout_str, "%f", &notification_timeout_sec) != 1) {
         fprintf(stderr, "error: expected timeout to be a floating point number, was: '%s'\n", timeout_str);
-        usage(resources_path);
+        usage();
     }
 
-    const mgl::Color icon_color = parse_hex_color(icon_color_str ? icon_color_str : "FFFFFF", resources_path);
-    const mgl::Color bg_color = parse_hex_color(bg_color_str ? bg_color_str : "76b900", resources_path);
+    const mgl::Color icon_color = parse_hex_color(icon_color_str ? icon_color_str : "FFFFFF");
+    const mgl::Color bg_color = parse_hex_color(bg_color_str ? bg_color_str : "76b900");
 
     mgl::Init init;
 
