@@ -157,6 +157,8 @@ static const mgl_monitor* find_monitor_by_cursor_position(mgl::Window &window) {
 }
 
 int main(int argc, char **argv) {
+    setlocale(LC_ALL, "C"); // Sigh... stupid C
+
     std::string resources_path;
     if(access("images/stream.png", F_OK) == 0) {
         resources_path = "./";
