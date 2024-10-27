@@ -1,6 +1,10 @@
 # GPU Screen Recorder Notification
 Notification in the style of ShadowPlay.
 
+# Installation
+If you are using an Arch Linux based distro then you can find gpu screen recorder notification on aur under the name gpu-screen-recorder-notification (`yay -S gpu-screen-recorder-notification`).\
+If you are running another distro then you can run `sudo ./install.sh`, but you need to manually install the dependencies, as described below.
+
 # Dependencies
 GPU Screen Recorder overlay uses meson build system so you need to install `meson` to build GPU Screen Recorder notification.
 
