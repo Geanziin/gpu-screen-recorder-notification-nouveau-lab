@@ -1,6 +1,9 @@
 # GPU Screen Recorder Notification
 Notification in the style of ShadowPlay.
 
+
+On X11 the notification shows on the monitor that the cursor is on. On Wayland the notification shows on the monitor the Wayland compositor considers focused.
+
 # Installation
 If you are using an Arch Linux based distro then you can find gpu screen recorder notification on aur under the name gpu-screen-recorder-notification (`yay -S gpu-screen-recorder-notification`).\
 If you are running another distro then you can run `sudo ./install.sh`, but you need to manually install the dependencies, as described below.

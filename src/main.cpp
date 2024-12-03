@@ -18,6 +18,7 @@
 #include <limits.h>
 
 #include <X11/Xlib.h>
+#include <X11/Xatom.h>
 #include <X11/extensions/Xfixes.h>
 #include <X11/extensions/shape.h>
 
@@ -96,6 +97,11 @@ static void make_window_click_through(Display *display, Window window) {
     XFixesDestroyRegion(display, region);
 }
 
+static bool is_xwayland(Display *display) {
+    int opcode, event, error;
+    return XQueryExtension(display, "XWAYLAND", &opcode, &event, &error);
+}
+
 static void usage() {
     fprintf(stderr, "usage: gsr-notify <--text text> <--timeout timeout> [--icon filepath] [--icon-color color] [--bg-color color]\n");
     fprintf(stderr, "options:\n");
@@ -145,15 +151,58 @@ static mgl::Color parse_hex_color(const char *str) {
 }
 
 // Returns the first monitor if not found. Assumes there is at least one monitor connected.
-static const mgl_monitor* find_monitor_by_cursor_position(mgl::Window &window) {
+static const mgl_monitor* find_monitor_at_position(mgl::Window &window, mgl::vec2i pos) {
     const mgl_window *win = window.internal_window();
     assert(win->num_monitors > 0);
     for(int i = 0; i < win->num_monitors; ++i) {
         const mgl_monitor *mon = &win->monitors[i];
-        if(mgl::IntRect({ mon->pos.x, mon->pos.y }, { mon->size.x, mon->size.y }).contains({ win->cursor_position.x, win->cursor_position.y }))
+        if(mgl::IntRect({ mon->pos.x, mon->pos.y }, { mon->size.x, mon->size.y }).contains(pos))
             return mon;
     }
     return &win->monitors[0];
+}
+
+static mgl::vec2i create_window_get_center_position(Display *display) {
+    const int screen = DefaultScreen(display);
+    XSetWindowAttributes window_attr;
+    window_attr.event_mask = StructureNotifyMask;
+    const Window window = XCreateWindow(display, DefaultRootWindow(display), 0, 0, 32, 32, 0, DefaultDepth(display, screen), InputOutput, DefaultVisual(display, screen), CWEventMask, &window_attr);
+    if(!window)
+        return {0, 0};
+
+    const Atom net_wm_window_type_atom = XInternAtom(display, "_NET_WM_WINDOW_TYPE", False);
+    const Atom net_wm_window_type_notification_atom = XInternAtom(display, "_NET_WM_WINDOW_TYPE_NOTIFICATION", False);
+    const Atom net_wm_window_type_utility = XInternAtom(display, "_NET_WM_WINDOW_TYPE_UTILITY", False);
+    const Atom net_wm_window_opacity = XInternAtom(display, "_NET_WM_WINDOW_OPACITY", False);
+
+    const Atom window_type_atoms[2] = {
+        net_wm_window_type_notification_atom,
+        net_wm_window_type_utility
+    };
+    XChangeProperty(display, window, net_wm_window_type_atom, XA_ATOM, 32, PropModeReplace, (const unsigned char*)window_type_atoms, 2L);
+
+    const double alpha = 0.0;
+    const unsigned long opacity = (unsigned long)(0xFFFFFFFFul * alpha);
+    XChangeProperty(display, window, net_wm_window_opacity, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&opacity, 1L);
+
+    XMapWindow(display, window);
+    XFlush(display);
+
+    mgl::vec2i window_pos;
+    XEvent xev;
+    while(true) {
+        XNextEvent(display, &xev);
+        if(xev.type == ConfigureNotify) {
+            window_pos.x = xev.xconfigure.x + xev.xconfigure.width / 2;
+            window_pos.y = xev.xconfigure.y + xev.xconfigure.height / 2;
+            break;
+        }
+    }
+
+    XDestroyWindow(display, window);
+    XFlush(display);
+
+    return window_pos;
 }
 
 int main(int argc, char **argv) {
@@ -225,6 +274,8 @@ int main(int argc, char **argv) {
     const mgl::Color bg_color = parse_hex_color(bg_color_str ? bg_color_str : "76b900");
 
     mgl::Init init;
+    Display *display = (Display*)mgl_get_context()->connection;
+    const bool wayland = is_xwayland(display);
 
     mgl::Window::CreateParams window_create_params;
     window_create_params.size = { 1280, 720 };
@@ -240,13 +291,15 @@ int main(int argc, char **argv) {
     if(!window.create("GPU Screen Recorder Notification", window_create_params))
         return 1;
 
-    mgl_window *win = window.internal_window();
+    const mgl_window *win = window.internal_window();
     if(win->num_monitors == 0) {
         fprintf(stderr, "Error: no monitors found\n");
         exit(1);
     }
 
-    const mgl_monitor *focused_monitor = find_monitor_by_cursor_position(window);
+    // The cursor position is wrong on wayland if an x11 window is not focused. On wayland we instead create a window and get the position where the wayland compositor puts it
+    const mgl::vec2i monitor_position_query_value = wayland ? create_window_get_center_position(display) : mgl::vec2i(win->cursor_position.x, win->cursor_position.y);
+    const mgl_monitor *focused_monitor = find_monitor_at_position(window, monitor_position_query_value);
 
     const std::string noto_sans_bold_filepath = resources_path + "fonts/NotoSans-Bold.ttf";
     mgl::MemoryMappedFile font_file;
@@ -290,8 +343,6 @@ int main(int argc, char **argv) {
         logo_sprite_padding_x = (int)((window_height - logo_sprite.get_size().y) * 0.4f);
         padding_between_icon_and_text_x = (int)(logo_sprite_padding_x * 0.7f);
     }
-
-    Display *display = (Display*)mgl_get_context()->connection;
 
     // TODO: Make sure the notification always stays on top. Test with starting the notification and then opening youtube in fullscreen.
     const int window_width = content_padding_left + logo_sprite_padding_x + logo_sprite.get_size().x + padding_between_icon_and_text_x + text.get_bounds().size.x + logo_sprite_padding_x + padding_between_icon_and_text_x;
