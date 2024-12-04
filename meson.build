@@ -15,7 +15,7 @@ mglpp_dep = mglpp_proj.get_variable('mglpp_dep')
 
 dep = [
     mglpp_dep,
-    dependency('xfixes'),
+    dependency('xext'),
 ]
 
 prefix = get_option('prefix')

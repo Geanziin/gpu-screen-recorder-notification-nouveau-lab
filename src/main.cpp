@@ -19,7 +19,6 @@
 
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
-#include <X11/extensions/Xfixes.h>
 #include <X11/extensions/shape.h>
 
 extern "C" {
@@ -92,9 +91,16 @@ static Bool make_window_sticky(Display* display, Window window) {
 static void make_window_click_through(Display *display, Window window) {
     XRectangle rect;
     memset(&rect, 0, sizeof(rect));
-    XserverRegion region = XFixesCreateRegion(display, &rect, 1);
-    XFixesSetWindowShapeRegion(display, window, ShapeInput, 0, 0, region);
-    XFixesDestroyRegion(display, region);
+    XShapeCombineRectangles(display, window, ShapeInput, 0, 0, &rect, 1, ShapeSet, YXBanded);
+}
+
+static void set_window_clip_region(Display *display, Window window, mgl::vec2i pos, mgl::vec2i size) {
+    if(size.x < 0)
+        size.x = 0;
+    if(size.y < 0)
+        size.y = 0;
+    XRectangle rectangle = {(short)pos.x, (short)pos.y, (unsigned short)size.x, (unsigned short)size.y};
+    XShapeCombineRectangles(display, window, ShapeBounding, 0, 0, &rectangle, 1, ShapeSet, YXBanded);
 }
 
 static bool is_xwayland(Display *display) {
@@ -163,10 +169,9 @@ static const mgl_monitor* find_monitor_at_position(mgl::Window &window, mgl::vec
 }
 
 static mgl::vec2i create_window_get_center_position(Display *display) {
-    const int screen = DefaultScreen(display);
     XSetWindowAttributes window_attr;
     window_attr.event_mask = StructureNotifyMask;
-    const Window window = XCreateWindow(display, DefaultRootWindow(display), 0, 0, 32, 32, 0, DefaultDepth(display, screen), InputOutput, DefaultVisual(display, screen), CWEventMask, &window_attr);
+    const Window window = XCreateWindow(display, DefaultRootWindow(display), 0, 0, 32, 32, 0, CopyFromParent, InputOutput, CopyFromParent, CWEventMask, &window_attr);
     if(!window)
         return {0, 0};
 
@@ -404,8 +409,11 @@ int main(int argc, char **argv) {
 
         switch(current_state.state) {
             case State::SLIDE_IN_WINDOW: {
-                double new_slide_x = interpolate(slide_window_start_x, slide_window_end_x, state_interpolation);
+                const double new_slide_x = interpolate(slide_window_start_x, slide_window_end_x, state_interpolation);
+                const mgl::vec2i window_clip(std::max(0.0, slide_window_start_x - new_slide_x), window_size.y);
+                set_window_clip_region(display, window.get_system_handle(), {0, 0}, window_clip);
                 window.set_position(mgl::vec2i(new_slide_x, window_start_position.y));
+                XFlush(display);
                 break;
             }
             case State::SLIDE_IN_CONTENT: {
@@ -413,13 +421,13 @@ int main(int argc, char **argv) {
                 break;
             }
             case State::FADE_IN_CONTENT: {
-                double new_alpha = interpolate(content_start_alpha, content_end_alpha, state_interpolation);
+                const double new_alpha = interpolate(content_start_alpha, content_end_alpha, state_interpolation);
                 text.set_color(mgl::Color(255, 255, 255, new_alpha * 255.0f));
                 logo_sprite.set_color(mgl::Color(icon_color.r, icon_color.g, icon_color.b, new_alpha * 255.0f));
                 break;
             }
             case State::FADE_OUT_CONTENT: {
-                double new_alpha = interpolate(content_end_alpha, content_start_alpha, state_interpolation);
+                const double new_alpha = interpolate(content_end_alpha, content_start_alpha, state_interpolation);
                 text.set_color(mgl::Color(255, 255, 255, new_alpha * 255.0f));
                 logo_sprite.set_color(mgl::Color(icon_color.r, icon_color.g, icon_color.b, new_alpha * 255.0f));
                 break;
@@ -429,8 +437,11 @@ int main(int argc, char **argv) {
                 break;
             }
             case State::SLIDE_OUT_WINDOW: {
-                double new_slide_x = interpolate(slide_window_end_x, slide_window_start_x, state_interpolation);
+                const double new_slide_x = interpolate(slide_window_end_x, slide_window_start_x, state_interpolation);
+                const mgl::vec2i window_clip(std::max(0.0, slide_window_start_x - new_slide_x), window_size.y);
+                set_window_clip_region(display, window.get_system_handle(), {0, 0}, window_clip);
                 window.set_position(mgl::vec2i(new_slide_x, window_start_position.y));
+                XFlush(display);
                 break;
             }
             case State::PAUSE: {
