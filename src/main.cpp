@@ -355,6 +355,7 @@ int main(int argc, char **argv) {
     const mgl::vec2i window_start_position{focused_monitor->pos.x + focused_monitor->size.x, focused_monitor->pos.y + window_size.y};
     window.set_size_limits(window_size, window_size);
     window.set_size(window_size);
+    set_window_clip_region(display, window.get_system_handle(), {0, 0}, {0, 0});
     window.set_position(window_start_position);
     make_window_click_through(display, window.get_system_handle());
     window.set_visible(true);
