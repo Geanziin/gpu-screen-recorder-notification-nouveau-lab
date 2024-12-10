@@ -1,0 +1,1 @@
+XFixes for hiding portion of window doesn't work in Hyprland. That means when the window is animated then a portion of it can be visible on another monitor.

@@ -16,6 +16,7 @@
 #include <assert.h>
 #include <unistd.h>
 #include <limits.h>
+#include <poll.h>
 
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
@@ -169,10 +170,11 @@ static const mgl_monitor* find_monitor_at_position(mgl::Window &window, mgl::vec
 }
 
 static mgl::vec2i create_window_get_center_position(Display *display) {
+    const int size = 16;
     XSetWindowAttributes window_attr;
     window_attr.event_mask = StructureNotifyMask;
     window_attr.background_pixel = 0;
-    const Window window = XCreateWindow(display, DefaultRootWindow(display), 0, 0, 16, 16, 0, CopyFromParent, InputOutput, CopyFromParent, CWBackPixel | CWEventMask, &window_attr);
+    const Window window = XCreateWindow(display, DefaultRootWindow(display), 0, 0, size, size, 0, CopyFromParent, InputOutput, CopyFromParent, CWBackPixel | CWEventMask, &window_attr);
     if(!window)
         return {0, 0};
 
@@ -191,12 +193,36 @@ static mgl::vec2i create_window_get_center_position(Display *display) {
     const unsigned long opacity = (unsigned long)(0xFFFFFFFFul * alpha);
     XChangeProperty(display, window, net_wm_window_opacity, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&opacity, 1L);
 
+    XSizeHints *size_hints = XAllocSizeHints();
+    size_hints->width = size;
+    size_hints->min_width = size;
+    size_hints->max_width = size;
+    size_hints->height = size;
+    size_hints->min_height = size;
+    size_hints->max_height = size;
+    size_hints->flags = PSize | PMinSize | PMaxSize;
+    XSetWMNormalHints(display, window, size_hints);
+    XFree(size_hints);
+
     XMapWindow(display, window);
     XFlush(display);
 
+    const int x_fd = XConnectionNumber(display);
     mgl::vec2i window_pos;
     XEvent xev;
     while(true) {
+        struct pollfd poll_fd;
+        poll_fd.fd = x_fd;
+        poll_fd.events = POLLIN;
+        poll_fd.revents = 0;
+        const int fds_ready = poll(&poll_fd, 1, 1000);
+        if(fds_ready == 0) {
+            fprintf(stderr, "Error: timed out waiting for ConfigureNotify after XCreateWindow\n");
+            break;
+        } else if(fds_ready == -1 || !(poll_fd.revents & POLLIN)) {
+            continue;
+        }
+
         XNextEvent(display, &xev);
         if(xev.type == ConfigureNotify) {
             window_pos.x = xev.xconfigure.x + xev.xconfigure.width / 2;
