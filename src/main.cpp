@@ -110,7 +110,7 @@ static bool is_xwayland(Display *display) {
 }
 
 static void usage() {
-    fprintf(stderr, "usage: gsr-notify <--text text> <--timeout timeout> [--icon filepath] [--icon-color color] [--bg-color color]\n");
+    fprintf(stderr, "usage: gsr-notify --text text --timeout timeout [--icon filepath] [--icon-color color] [--bg-color color]\n");
     fprintf(stderr, "options:\n");
     fprintf(stderr, "  --text        The text to display in the notification. Required.\n");
     fprintf(stderr, "  --timeout     The time to display the notification in seconds (excluding animation time), expected to be a floating point number. Required.\n");
@@ -366,7 +366,7 @@ int main(int argc, char **argv) {
     text.set_color(mgl::Color(255, 255, 255, 0));
 
     mgl::Sprite logo_sprite;
-    float logo_sprite_padding_x = 20.0f;
+    float logo_sprite_padding_x = (int)(window_height * 0.5f);
     float padding_between_icon_and_text_x = 0.0f;
     if(logo_texture.is_valid()) {
         logo_sprite.set_texture(&logo_texture);
