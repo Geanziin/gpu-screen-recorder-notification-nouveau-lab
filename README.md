@@ -18,7 +18,7 @@ These are the dependencies needed to build GPU Screen Recorder Notification:
 * libglvnd (which provides libgl, libglx and libegl)
 
 # License
-This software is licensed under GPL3.0-only. `fonts/NotoSans-Bold.ttf` is licensed under `SIL Open Font License`.
+This software is licensed under GPL3.0-only. Files under `fonts/` directory belong to the Noto Sans Google fonts project and they are licensed under `SIL Open Font License`.
 
 # Screenshots
 ![](https://dec05eba.com/images/gsr-notify-screenshot.png)
