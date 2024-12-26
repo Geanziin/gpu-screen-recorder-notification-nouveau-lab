@@ -376,6 +376,9 @@ int main(int argc, char **argv) {
         padding_between_icon_and_text_x = (int)(logo_sprite_padding_x * 0.7f);
     }
 
+    unsigned char data = 1; // Prefer not being composed to not reduce display fps on AMD when an application is using 100% of GPU
+    XChangeProperty(display, window.get_system_handle(), XInternAtom(display, "_NET_WM_BYPASS_COMPOSITOR", False), XA_CARDINAL, 32, PropModeReplace, &data, 1);
+
     // TODO: Make sure the notification always stays on top. Test with starting the notification and then opening youtube in fullscreen.
     const int window_width = content_padding_left + logo_sprite_padding_x + logo_sprite.get_size().x + padding_between_icon_and_text_x + text.get_bounds().size.x + logo_sprite_padding_x + padding_between_icon_and_text_x;
     const mgl::vec2i window_size{window_width, window_height};
