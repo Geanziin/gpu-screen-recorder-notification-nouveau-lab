@@ -320,7 +320,7 @@ int main(int argc, char **argv) {
     window_create_params.window_type = MGL_WINDOW_TYPE_NOTIFICATION;
 
     mgl::Window window;
-    if(!window.create("GPU Screen Recorder Notification", window_create_params))
+    if(!window.create("gsr notify", window_create_params))
         return 1;
 
     const mgl_window *win = window.internal_window();
