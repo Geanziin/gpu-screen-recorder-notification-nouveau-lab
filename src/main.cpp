@@ -241,7 +241,7 @@ int main(int argc, char **argv) {
     setlocale(LC_ALL, "C"); // Sigh... stupid C
 
     std::string resources_path;
-    if(access("sibs-build", F_OK) == 0) {
+    if(access("sibs-build/linux_x86_64/debug/gsr-notify", F_OK) == 0) {
         resources_path = "./";
     } else {
 #ifdef GSR_NOTIFY_RESOURCES_PATH
