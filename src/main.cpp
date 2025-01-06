@@ -179,14 +179,36 @@ static mgl::vec2i get_cursor_position(Display *dpy) {
     return root_pos;
 }
 
-static mgl::vec2i create_window_get_center_position(Display *display) {
-    const int size = 16;
+typedef struct {
+    unsigned long flags;
+    unsigned long functions;
+    unsigned long decorations;
+    long input_mode;
+    unsigned long status;
+} MotifHints;
+
+#define MWM_HINTS_DECORATIONS   2
+
+#define MWM_DECOR_NONE          0
+#define MWM_DECOR_ALL           1
+
+static void window_set_decorations_visible(Display *display, Window window, bool visible) {
+    const Atom motif_wm_hints_atom = XInternAtom(display, "_MOTIF_WM_HINTS", False);
+    MotifHints motif_hints;
+    memset(&motif_hints, 0, sizeof(motif_hints));
+    motif_hints.flags = MWM_HINTS_DECORATIONS;
+    motif_hints.decorations = visible ? MWM_DECOR_ALL : MWM_DECOR_NONE;
+    XChangeProperty(display, window, motif_wm_hints_atom, motif_wm_hints_atom, 32, PropModeReplace, (unsigned char*)&motif_hints, sizeof(motif_hints) / sizeof(long));
+}
+
+static bool create_window_get_center_position_kde(Display *display, mgl::vec2i &position) {
+    const int size = 1;
     XSetWindowAttributes window_attr;
     window_attr.event_mask = StructureNotifyMask;
     window_attr.background_pixel = 0;
     const Window window = XCreateWindow(display, DefaultRootWindow(display), 0, 0, size, size, 0, CopyFromParent, InputOutput, CopyFromParent, CWBackPixel | CWEventMask, &window_attr);
     if(!window)
-        return {0, 0};
+        return false;
 
     const Atom net_wm_window_type_atom = XInternAtom(display, "_NET_WM_WINDOW_TYPE", False);
     const Atom net_wm_window_type_notification_atom = XInternAtom(display, "_NET_WM_WINDOW_TYPE_NOTIFICATION", False);
@@ -203,12 +225,14 @@ static mgl::vec2i create_window_get_center_position(Display *display) {
     const unsigned long opacity = (unsigned long)(0xFFFFFFFFul * alpha);
     XChangeProperty(display, window, net_wm_window_opacity, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&opacity, 1L);
 
+    window_set_decorations_visible(display, window, false);
+
     XSizeHints *size_hints = XAllocSizeHints();
     size_hints->width = size;
-    size_hints->min_width = size;
-    size_hints->max_width = size;
     size_hints->height = size;
+    size_hints->min_width = size;
     size_hints->min_height = size;
+    size_hints->max_width = size;
     size_hints->max_height = size;
     size_hints->flags = PSize | PMinSize | PMaxSize;
     XSetWMNormalHints(display, window, size_hints);
@@ -217,8 +241,8 @@ static mgl::vec2i create_window_get_center_position(Display *display) {
     XMapWindow(display, window);
     XFlush(display);
 
+    bool got_data = false;
     const int x_fd = XConnectionNumber(display);
-    mgl::vec2i window_pos;
     XEvent xev;
     while(true) {
         struct pollfd poll_fd;
@@ -235,8 +259,9 @@ static mgl::vec2i create_window_get_center_position(Display *display) {
 
         XNextEvent(display, &xev);
         if(xev.type == ConfigureNotify) {
-            window_pos.x = xev.xconfigure.x + xev.xconfigure.width / 2;
-            window_pos.y = xev.xconfigure.y + xev.xconfigure.height / 2;
+            got_data = xev.xconfigure.x > 0 && xev.xconfigure.y > 0;
+            position.x = xev.xconfigure.x + xev.xconfigure.width / 2;
+            position.y = xev.xconfigure.y + xev.xconfigure.height / 2;
             break;
         }
     }
@@ -244,7 +269,90 @@ static mgl::vec2i create_window_get_center_position(Display *display) {
     XDestroyWindow(display, window);
     XFlush(display);
 
-    return window_pos;
+    return got_data;
+}
+
+static bool create_window_get_center_position_gnome(Display *display, mgl::vec2i &position) {
+    const int size = 32;
+    XSetWindowAttributes window_attr;
+    window_attr.event_mask = StructureNotifyMask | ExposureMask;
+    window_attr.background_pixel = 0;
+    const Window window = XCreateWindow(display, DefaultRootWindow(display), 0, 0, size, size, 0, CopyFromParent, InputOutput, CopyFromParent, CWBackPixel | CWEventMask, &window_attr);
+    if(!window)
+        return false;
+
+    const Atom net_wm_window_opacity = XInternAtom(display, "_NET_WM_WINDOW_OPACITY", False);
+    const double alpha = 0.0;
+    const unsigned long opacity = (unsigned long)(0xFFFFFFFFul * alpha);
+    XChangeProperty(display, window, net_wm_window_opacity, XA_CARDINAL, 32, PropModeReplace, (unsigned char *)&opacity, 1L);
+
+    window_set_decorations_visible(display, window, false);
+
+    XSizeHints *size_hints = XAllocSizeHints();
+    size_hints->width = size;
+    size_hints->height = size;
+    size_hints->min_width = size;
+    size_hints->min_height = size;
+    size_hints->max_width = size;
+    size_hints->max_height = size;
+    size_hints->flags = PSize | PMinSize | PMaxSize;
+    XSetWMNormalHints(display, window, size_hints);
+    XFree(size_hints);
+
+    XMapWindow(display, window);
+    XFlush(display);
+
+    bool got_data = false;
+    const int x_fd = XConnectionNumber(display);
+    XEvent xev;
+    while(true) {
+        struct pollfd poll_fd;
+        poll_fd.fd = x_fd;
+        poll_fd.events = POLLIN;
+        poll_fd.revents = 0;
+        const int fds_ready = poll(&poll_fd, 1, 1000);
+        if(fds_ready == 0) {
+            fprintf(stderr, "Error: timed out waiting for MapNotify/ConfigureNotify after XCreateWindow\n");
+            break;
+        } else if(fds_ready == -1 || !(poll_fd.revents & POLLIN)) {
+            continue;
+        }
+
+        XNextEvent(display, &xev);
+        if(xev.type == MapNotify) {
+            int x = 0;
+            int y = 0;
+            Window w = None;
+            XTranslateCoordinates(display, window, DefaultRootWindow(display), 0, 0, &x, &y, &w);
+
+            got_data = x > 0 && y > 0;
+            position.x = x + size / 2;
+            position.y = y + size / 2;
+            if(got_data)
+                break;
+        } else if(xev.type == ConfigureNotify) {
+            got_data = xev.xconfigure.x > 0 && xev.xconfigure.y > 0;
+            position.x = xev.xconfigure.x + xev.xconfigure.width / 2;
+            position.y = xev.xconfigure.y + xev.xconfigure.height / 2;
+            if(got_data)
+                break;
+        }
+    }
+
+    XDestroyWindow(display, window);
+    XFlush(display);
+
+    return got_data;
+}
+
+static mgl::vec2i create_window_get_center_position(Display *display) {
+    mgl::vec2i pos;
+    if(!create_window_get_center_position_kde(display, pos)) {
+        pos.x = 0;
+        pos.y = 0;
+        create_window_get_center_position_gnome(display, pos);
+    }
+    return pos;
 }
 
 int main(int argc, char **argv) {
