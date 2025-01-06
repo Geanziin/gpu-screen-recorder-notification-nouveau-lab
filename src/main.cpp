@@ -177,6 +177,7 @@ static mgl::vec2i get_cursor_position(Display *dpy, Window *window) {
     mgl::vec2i root_pos;
     XQueryPointer(dpy, DefaultRootWindow(dpy), &root_window, window, &root_pos.x, &root_pos.y, &dummy_i, &dummy_i, &dummy_u);
 
+    // This dumb shit is done to satisfy gnome wayland. Only set |window| if a valid x11 window is focused
     if(window) {
         XWindowAttributes attr;
         if(XGetWindowAttributes(dpy, *window, &attr) && attr.override_redirect)
@@ -191,8 +192,6 @@ static mgl::vec2i get_cursor_position(Display *dpy, Window *window) {
             } else {
                 *window = None;
             }
-        } else {
-            fprintf(stderr, "xgetinputfocus failed\n");
         }
     }
 
