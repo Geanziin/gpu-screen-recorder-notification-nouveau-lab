@@ -169,13 +169,13 @@ static const mgl_monitor* find_monitor_at_position(mgl::Window &window, mgl::vec
     return &win->monitors[0];
 }
 
-static mgl::vec2i get_cursor_position(Display *dpy) {
+static mgl::vec2i get_cursor_position(Display *dpy, Window *window) {
     Window root_window = None;
-    Window window = None;
+    *window = None;
     int dummy_i;
     unsigned int dummy_u;
     mgl::vec2i root_pos;
-    XQueryPointer(dpy, DefaultRootWindow(dpy), &root_window, &window, &root_pos.x, &root_pos.y, &dummy_i, &dummy_i, &dummy_u);
+    XQueryPointer(dpy, DefaultRootWindow(dpy), &root_window, window, &root_pos.x, &root_pos.y, &dummy_i, &dummy_i, &dummy_u);
     return root_pos;
 }
 
@@ -448,7 +448,9 @@ int main(int argc, char **argv) {
     }
 
     // The cursor position is wrong on wayland if an x11 window is not focused. On wayland we instead create a window and get the position where the wayland compositor puts it
-    const mgl::vec2i monitor_position_query_value = wayland ? create_window_get_center_position(display) : get_cursor_position(display);
+    Window cursor_window = None;
+    const mgl::vec2i cursor_position = get_cursor_position(display, &cursor_window);
+    const mgl::vec2i monitor_position_query_value = (cursor_window || !wayland) ? cursor_position : create_window_get_center_position(display);
     const mgl_monitor *focused_monitor = find_monitor_at_position(window, monitor_position_query_value);
 
     const std::string noto_sans_bold_filepath = resources_path + "fonts/NotoSans-Bold.ttf";
