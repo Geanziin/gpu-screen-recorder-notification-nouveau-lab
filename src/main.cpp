@@ -176,6 +176,26 @@ static mgl::vec2i get_cursor_position(Display *dpy, Window *window) {
     unsigned int dummy_u;
     mgl::vec2i root_pos;
     XQueryPointer(dpy, DefaultRootWindow(dpy), &root_window, window, &root_pos.x, &root_pos.y, &dummy_i, &dummy_i, &dummy_u);
+
+    if(window) {
+        XWindowAttributes attr;
+        if(XGetWindowAttributes(dpy, *window, &attr) && attr.override_redirect)
+            *window = None;
+
+        int revert_to = 0;
+        Window input_focus_window = None;
+        if(XGetInputFocus(dpy, &input_focus_window, &revert_to)) {
+            if(input_focus_window) {
+                if(XGetWindowAttributes(dpy, input_focus_window, &attr) && attr.override_redirect)
+                    *window = None;
+            } else {
+                *window = None;
+            }
+        } else {
+            fprintf(stderr, "xgetinputfocus failed\n");
+        }
+    }
+
     return root_pos;
 }
 
