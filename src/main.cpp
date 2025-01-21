@@ -308,7 +308,7 @@ static bool create_window_get_center_position_kde(Display *display, mgl::vec2i &
         poll_fd.fd = x_fd;
         poll_fd.events = POLLIN;
         poll_fd.revents = 0;
-        const int fds_ready = poll(&poll_fd, 1, 1000);
+        const int fds_ready = poll(&poll_fd, 1, 200);
         if(fds_ready == 0) {
             fprintf(stderr, "Error: timed out waiting for ConfigureNotify after XCreateWindow\n");
             break;
@@ -372,7 +372,7 @@ static bool create_window_get_center_position_gnome(Display *display, mgl::vec2i
         poll_fd.fd = x_fd;
         poll_fd.events = POLLIN;
         poll_fd.revents = 0;
-        const int fds_ready = poll(&poll_fd, 1, 1000);
+        const int fds_ready = poll(&poll_fd, 1, 200);
         if(fds_ready == 0) {
             fprintf(stderr, "Error: timed out waiting for MapNotify/ConfigureNotify after XCreateWindow\n");
             break;
