@@ -169,6 +169,63 @@ static const mgl_monitor* find_monitor_at_position(mgl::Window &window, mgl::vec
     return &win->monitors[0];
 }
 
+static bool window_has_atom(Display *dpy, Window window, Atom atom) {
+    Atom type;
+    unsigned long len, bytes_left;
+    int format;
+    unsigned char *properties = NULL;
+    if(XGetWindowProperty(dpy, window, atom, 0, 1024, False, AnyPropertyType, &type, &format, &len, &bytes_left, &properties) < Success)
+        return false;
+
+    if(properties)
+        XFree(properties);
+
+    return type != None;
+}
+
+static bool window_is_user_program(Display *dpy, Window window) {
+    const Atom net_wm_state_atom = XInternAtom(dpy, "_NET_WM_STATE", False);
+    const Atom wm_state_atom = XInternAtom(dpy, "WM_STATE", False);
+    return window_has_atom(dpy, window, net_wm_state_atom) || window_has_atom(dpy, window, wm_state_atom);
+}
+
+static Window window_get_target_window_child(Display *display, Window window) {
+    if(window == None)
+        return None;
+
+    if(window_is_user_program(display, window))
+        return window;
+
+    Window root;
+    Window parent;
+    Window *children = nullptr;
+    unsigned int num_children = 0;
+    if(!XQueryTree(display, window, &root, &parent, &children, &num_children) || !children)
+        return None;
+
+    Window found_window = None;
+    for(int i = num_children - 1; i >= 0; --i) {
+        if(children[i] && window_is_user_program(display, children[i])) {
+            found_window = children[i];
+            goto finished;
+        }
+    }
+
+    for(int i = num_children - 1; i >= 0; --i) {
+        if(children[i]) {
+            Window win = window_get_target_window_child(display, children[i]);
+            if(win) {
+                found_window = win;
+                goto finished;
+            }
+        }
+    }
+
+    finished:
+    XFree(children);
+    return found_window;
+}
+
 static mgl::vec2i get_cursor_position(Display *dpy, Window *window) {
     Window root_window = None;
     *window = None;
@@ -176,25 +233,8 @@ static mgl::vec2i get_cursor_position(Display *dpy, Window *window) {
     unsigned int dummy_u;
     mgl::vec2i root_pos;
     XQueryPointer(dpy, DefaultRootWindow(dpy), &root_window, window, &root_pos.x, &root_pos.y, &dummy_i, &dummy_i, &dummy_u);
-
-    // This dumb shit is done to satisfy gnome wayland. Only set |window| if a valid x11 window is focused
-    if(window) {
-        XWindowAttributes attr;
-        if(XGetWindowAttributes(dpy, *window, &attr) && attr.override_redirect)
-            *window = None;
-
-        int revert_to = 0;
-        Window input_focus_window = None;
-        if(XGetInputFocus(dpy, &input_focus_window, &revert_to)) {
-            if(input_focus_window) {
-                if(XGetWindowAttributes(dpy, input_focus_window, &attr) && attr.override_redirect)
-                    *window = None;
-            } else {
-                *window = None;
-            }
-        }
-    }
-
+    if(window)
+        *window = window_get_target_window_child(dpy, *window);
     return root_pos;
 }
 
@@ -276,15 +316,18 @@ static bool create_window_get_center_position_kde(Display *display, mgl::vec2i &
             continue;
         }
 
-        XNextEvent(display, &xev);
-        if(xev.type == ConfigureNotify && xev.xconfigure.window == window) {
-            got_data = xev.xconfigure.x > 0 && xev.xconfigure.y > 0;
-            position.x = xev.xconfigure.x + xev.xconfigure.width / 2;
-            position.y = xev.xconfigure.y + xev.xconfigure.height / 2;
-            break;
+        while(XPending(display)) {
+            XNextEvent(display, &xev);
+            if(xev.type == ConfigureNotify && xev.xconfigure.window == window) {
+                got_data = xev.xconfigure.x > 0 && xev.xconfigure.y > 0;
+                position.x = xev.xconfigure.x + xev.xconfigure.width / 2;
+                position.y = xev.xconfigure.y + xev.xconfigure.height / 2;
+                goto done;
+            }
         }
     }
 
+    done:
     XDestroyWindow(display, window);
     XFlush(display);
 
@@ -337,27 +380,30 @@ static bool create_window_get_center_position_gnome(Display *display, mgl::vec2i
             continue;
         }
 
-        XNextEvent(display, &xev);
-        if(xev.type == MapNotify && xev.xmap.window == window) {
-            int x = 0;
-            int y = 0;
-            Window w = None;
-            XTranslateCoordinates(display, window, DefaultRootWindow(display), 0, 0, &x, &y, &w);
+        while(XPending(display)) {
+            XNextEvent(display, &xev);
+            if(xev.type == MapNotify && xev.xmap.window == window) {
+                int x = 0;
+                int y = 0;
+                Window w = None;
+                XTranslateCoordinates(display, window, DefaultRootWindow(display), 0, 0, &x, &y, &w);
 
-            got_data = x > 0 && y > 0;
-            position.x = x + size / 2;
-            position.y = y + size / 2;
-            if(got_data)
-                break;
-        } else if(xev.type == ConfigureNotify && xev.xconfigure.window == window) {
-            got_data = xev.xconfigure.x > 0 && xev.xconfigure.y > 0;
-            position.x = xev.xconfigure.x + xev.xconfigure.width / 2;
-            position.y = xev.xconfigure.y + xev.xconfigure.height / 2;
-            if(got_data)
-                break;
+                got_data = x > 0 && y > 0;
+                position.x = x + size / 2;
+                position.y = y + size / 2;
+                if(got_data)
+                    goto done;
+            } else if(xev.type == ConfigureNotify && xev.xconfigure.window == window) {
+                got_data = xev.xconfigure.x > 0 && xev.xconfigure.y > 0;
+                position.x = xev.xconfigure.x + xev.xconfigure.width / 2;
+                position.y = xev.xconfigure.y + xev.xconfigure.height / 2;
+                if(got_data)
+                    goto done;
+            }
         }
     }
 
+    done:
     XDestroyWindow(display, window);
     XFlush(display);
 
@@ -447,7 +493,7 @@ int main(int argc, char **argv) {
     const bool wayland = is_xwayland(display);
 
     mgl::Window::CreateParams window_create_params;
-    window_create_params.size = { 1280, 720 };
+    window_create_params.size = { 32, 32 };
     window_create_params.min_size = window_create_params.size;
     window_create_params.max_size = window_create_params.size;
     window_create_params.hidden = true;
@@ -517,6 +563,9 @@ int main(int argc, char **argv) {
 
     unsigned char data = 1; // Prefer not being composed to not reduce display fps on AMD when an application is using 100% of GPU
     XChangeProperty(display, window.get_system_handle(), XInternAtom(display, "_NET_WM_BYPASS_COMPOSITOR", False), XA_CARDINAL, 32, PropModeReplace, &data, 1);
+
+    data = 1;
+    XChangeProperty(display, window.get_system_handle(), XInternAtom(display, "GAMESCOPE_EXTERNAL_OVERLAY", False), XA_CARDINAL, 32, PropModeReplace, &data, 1);
 
     // TODO: Make sure the notification always stays on top. Test with starting the notification and then opening youtube in fullscreen.
     const int window_width = content_padding_left + logo_sprite_padding_x + logo_sprite.get_size().x + padding_between_icon_and_text_x + text.get_bounds().size.x + logo_sprite_padding_x + padding_between_icon_and_text_x;
