@@ -491,6 +491,7 @@ int main(int argc, char **argv) {
     mgl::Init init;
     Display *display = (Display*)mgl_get_context()->connection;
     const bool wayland = is_xwayland(display);
+    const bool use_transparency = wayland;
 
     mgl::Window::CreateParams window_create_params;
     window_create_params.size = { 32, 32 };
@@ -498,7 +499,8 @@ int main(int argc, char **argv) {
     window_create_params.max_size = window_create_params.size;
     window_create_params.hidden = true;
     window_create_params.override_redirect = true;
-    window_create_params.background_color = bg_color;
+    window_create_params.support_alpha = true;
+    window_create_params.background_color = use_transparency ? mgl::Color(0, 0, 0, 0) : bg_color;
     window_create_params.hide_decorations = true;
     window_create_params.window_type = MGL_WINDOW_TYPE_NOTIFICATION;
 
@@ -570,10 +572,11 @@ int main(int argc, char **argv) {
     // TODO: Make sure the notification always stays on top. Test with starting the notification and then opening youtube in fullscreen.
     const int window_width = content_padding_left + logo_sprite_padding_x + logo_sprite.get_size().x + padding_between_icon_and_text_x + text.get_bounds().size.x + logo_sprite_padding_x + padding_between_icon_and_text_x;
     const mgl::vec2i window_size{window_width, window_height};
-    const mgl::vec2i window_start_position{focused_monitor->pos.x + focused_monitor->size.x, focused_monitor->pos.y + window_size.y};
+    const mgl::vec2i window_start_position{focused_monitor->pos.x + focused_monitor->size.x + (use_transparency ? -window_size.x : 0), focused_monitor->pos.y + window_size.y};
     window.set_size_limits(window_size, window_size);
     window.set_size(window_size);
-    set_window_clip_region(display, window.get_system_handle(), {0, 0}, {0, 0});
+    if(!use_transparency)
+        set_window_clip_region(display, window.get_system_handle(), {0, 0}, {0, 0});
     window.set_position(window_start_position);
     make_window_click_through(display, window.get_system_handle());
     window.set_visible(true);
@@ -596,6 +599,10 @@ int main(int argc, char **argv) {
     int current_state_index = 0;
 
     mgl::Clock state_timer;
+
+    mgl::Rectangle transparency_bg(window_size.to_vec2f());
+    transparency_bg.set_color(bg_color);
+    transparency_bg.set_position({(float)window_size.x, 0.0f});
 
     mgl::Rectangle content_bg(window_size.to_vec2f() - mgl::vec2f(content_padding_left, 0.0f));
     content_bg.set_color(mgl::Color(0, 0, 0));
@@ -630,9 +637,13 @@ int main(int argc, char **argv) {
             case State::SLIDE_IN_WINDOW: {
                 const double new_slide_x = interpolate(slide_window_start_x, slide_window_end_x, state_interpolation);
                 const mgl::vec2i window_clip(std::max(0.0, slide_window_start_x - new_slide_x), window_size.y);
-                set_window_clip_region(display, window.get_system_handle(), {0, 0}, window_clip);
-                window.set_position(mgl::vec2i(new_slide_x, window_start_position.y));
-                XFlush(display);
+                if(use_transparency) {
+                    transparency_bg.set_size(window_clip.floor().to_vec2f());
+                } else {
+                    set_window_clip_region(display, window.get_system_handle(), {0, 0}, window_clip);
+                    window.set_position(mgl::vec2i(new_slide_x, window_start_position.y));
+                    XFlush(display);
+                }
                 break;
             }
             case State::SLIDE_IN_CONTENT: {
@@ -658,9 +669,13 @@ int main(int argc, char **argv) {
             case State::SLIDE_OUT_WINDOW: {
                 const double new_slide_x = interpolate(slide_window_end_x, slide_window_start_x, state_interpolation);
                 const mgl::vec2i window_clip(std::max(0.0, slide_window_start_x - new_slide_x), window_size.y);
-                set_window_clip_region(display, window.get_system_handle(), {0, 0}, window_clip);
-                window.set_position(mgl::vec2i(new_slide_x, window_start_position.y));
-                XFlush(display);
+                if(use_transparency) {
+                    transparency_bg.set_size(window_clip.floor().to_vec2f());
+                } else {
+                    set_window_clip_region(display, window.get_system_handle(), {0, 0}, window_clip);
+                    window.set_position(mgl::vec2i(new_slide_x, window_start_position.y));
+                    XFlush(display);
+                }
                 break;
             }
             case State::PAUSE: {
@@ -668,7 +683,13 @@ int main(int argc, char **argv) {
             }
         }
 
-        window.clear(bg_color);
+        if(use_transparency) {
+            window.clear(mgl::Color(0, 0, 0, 0));
+            transparency_bg.set_position(mgl::vec2f(window_size.x - transparency_bg.get_size().x, 0.0f));
+            window.draw(transparency_bg);
+        } else {
+            window.clear(bg_color);
+        }
         window.draw(content_bg);
         window.draw(logo_sprite);
         window.draw(text);
