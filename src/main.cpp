@@ -572,7 +572,7 @@ int main(int argc, char **argv) {
     // TODO: Make sure the notification always stays on top. Test with starting the notification and then opening youtube in fullscreen.
     const int window_width = content_padding_left + logo_sprite_padding_x + logo_sprite.get_size().x + padding_between_icon_and_text_x + text.get_bounds().size.x + logo_sprite_padding_x + padding_between_icon_and_text_x;
     const mgl::vec2i window_size{window_width, window_height};
-    const mgl::vec2i window_start_position{focused_monitor->pos.x + focused_monitor->size.x + (use_transparency ? -window_size.x : 0), focused_monitor->pos.y + window_size.y};
+    const mgl::vec2i window_start_position{focused_monitor->pos.x + focused_monitor->size.x - window_size.x, focused_monitor->pos.y + window_size.y};
     window.set_size_limits(window_size, window_size);
     window.set_size(window_size);
     if(!use_transparency)
@@ -640,8 +640,7 @@ int main(int argc, char **argv) {
                 if(use_transparency) {
                     transparency_bg.set_size(window_clip.floor().to_vec2f());
                 } else {
-                    set_window_clip_region(display, window.get_system_handle(), {0, 0}, window_clip);
-                    window.set_position(mgl::vec2i(new_slide_x, window_start_position.y));
+                    set_window_clip_region(display, window.get_system_handle(), {window_size.x - window_clip.x, 0}, window_clip);
                     XFlush(display);
                 }
                 break;
@@ -672,8 +671,7 @@ int main(int argc, char **argv) {
                 if(use_transparency) {
                     transparency_bg.set_size(window_clip.floor().to_vec2f());
                 } else {
-                    set_window_clip_region(display, window.get_system_handle(), {0, 0}, window_clip);
-                    window.set_position(mgl::vec2i(new_slide_x, window_start_position.y));
+                    set_window_clip_region(display, window.get_system_handle(), {window_size.x - window_clip.x, 0}, window_clip);
                     XFlush(display);
                 }
                 break;
