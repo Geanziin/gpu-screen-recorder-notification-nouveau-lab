@@ -226,6 +226,45 @@ static Window window_get_target_window_child(Display *display, Window window) {
     return found_window;
 }
 
+static bool window_has_title(Display *dpy, Window window) {
+    bool result = false;
+    const Atom net_wm_name_atom = XInternAtom(dpy, "_NET_WM_NAME", False);
+    const Atom wm_name_atom = XInternAtom(dpy, "WM_NAME", False);
+    const Atom utf8_string_atom = XInternAtom(dpy, "UTF8_STRING", False);
+
+    Atom type = None;
+    int format = 0;
+    unsigned long num_items = 0;
+    unsigned long bytes_left = 0;
+    unsigned char *data = NULL;
+    XGetWindowProperty(dpy, window, net_wm_name_atom, 0, 1024, False, utf8_string_atom, &type, &format, &num_items, &bytes_left, &data);
+
+    if(type == utf8_string_atom && format == 8 && data) {
+        result = true;
+        goto done;
+    }
+
+    if(data)
+        XFree(data);
+
+    type = None;
+    format = 0;
+    num_items = 0;
+    bytes_left = 0;
+    data = NULL;
+    XGetWindowProperty(dpy, window, wm_name_atom, 0, 1024, False, 0, &type, &format, &num_items, &bytes_left, &data);
+
+    if((type == XA_STRING || type == utf8_string_atom) && data) {
+        result = true;
+        goto done;
+    }
+
+    done:
+    if(data)
+        XFree(data);
+    return result;
+}
+
 static mgl::vec2i get_cursor_position(Display *dpy, Window *window) {
     Window root_window = None;
     *window = None;
@@ -233,8 +272,17 @@ static mgl::vec2i get_cursor_position(Display *dpy, Window *window) {
     unsigned int dummy_u;
     mgl::vec2i root_pos;
     XQueryPointer(dpy, DefaultRootWindow(dpy), &root_window, window, &root_pos.x, &root_pos.y, &dummy_i, &dummy_i, &dummy_u);
-    if(window)
-        *window = window_get_target_window_child(dpy, *window);
+
+    const Window direct_window = *window;
+    *window = window_get_target_window_child(dpy, *window);
+    // HACK: Count some other x11 windows as having an x11 window focused. Some games seem to create an Input window and that gets focused.
+    if(!*window) {
+        XWindowAttributes attr;
+        memset(&attr, 0, sizeof(attr));
+        XGetWindowAttributes(dpy, direct_window, &attr);
+        if(attr.c_class == InputOnly && !window_has_title(dpy, direct_window))
+            *window = direct_window;
+    }
     return root_pos;
 }
 
