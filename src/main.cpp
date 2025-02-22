@@ -114,7 +114,7 @@ static void usage() {
     fprintf(stderr, "options:\n");
     fprintf(stderr, "  --text        The text to display in the notification. Required.\n");
     fprintf(stderr, "  --timeout     The time to display the notification in seconds (excluding animation time), expected to be a floating point number. Required.\n");
-    fprintf(stderr, "  --icon        A path to an image file to display on the left side of the text. This can also be either \"record\", \"replay\" or \"stream\" to use built-in images. Optional.\n");
+    fprintf(stderr, "  --icon        A path to an image file to display on the left side of the text. This can also be either \"record\", \"replay\", \"stream\" or \"screenshot\" to use built-in images. Optional.\n");
     fprintf(stderr, "  --icon-color  The color to display the icon as in hex format, for example FF0000. Optional, set to FFFFFF by default.\n");
     fprintf(stderr, "  --bg-color    The notification background (and side bar) color in hex format, for example FF0000. Optional, set to 76b900 by default.\n");
     fprintf(stderr, "examples:\n");
@@ -586,6 +586,8 @@ int main(int argc, char **argv) {
             icon_filepath_str = resources_path + "images/replay.png";
         else if(icon_filepath_str == "stream")
             icon_filepath_str = resources_path + "images/stream.png";
+        else if(icon_filepath_str == "screenshot")
+            icon_filepath_str = resources_path + "images/screenshot.png";
 
         if(!logo_texture.load_from_file(icon_filepath_str.c_str(), {false, false, true})) {
             fprintf(stderr, "Warning: failed to load icon\n");
