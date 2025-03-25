@@ -110,13 +110,14 @@ static bool is_xwayland(Display *display) {
 }
 
 static void usage() {
-    fprintf(stderr, "usage: gsr-notify --text text --timeout timeout [--icon filepath] [--icon-color color] [--bg-color color]\n");
+    fprintf(stderr, "usage: gsr-notify --text text --timeout timeout [--icon filepath] [--icon-color color] [--bg-color color] [--monitor monitor]\n");
     fprintf(stderr, "options:\n");
     fprintf(stderr, "  --text        The text to display in the notification. Required.\n");
     fprintf(stderr, "  --timeout     The time to display the notification in seconds (excluding animation time), expected to be a floating point number. Required.\n");
     fprintf(stderr, "  --icon        A path to an image file to display on the left side of the text. This can also be either \"record\", \"replay\", \"stream\" or \"screenshot\" to use built-in images. Optional.\n");
     fprintf(stderr, "  --icon-color  The color to display the icon as in hex format, for example FF0000. Optional, set to FFFFFF by default.\n");
     fprintf(stderr, "  --bg-color    The notification background (and side bar) color in hex format, for example FF0000. Optional, set to 76b900 by default.\n");
+    fprintf(stderr, "  --monitor     The monitor to display the notification on. This is the name of the monitor as displayed by xrandr. This can be \"auto\", in which case the focused monitor is used. Optional, set to \"auto\" by default.\n");
     fprintf(stderr, "examples:\n");
     fprintf(stderr, "  gsr-notify --text 'Recording has started' --timeout 3.0\n");
     fprintf(stderr, "  gsr-notify --text 'Recording has started' --timeout 3.0 --icon record\n");
@@ -167,6 +168,24 @@ static const mgl_monitor* find_monitor_at_position(mgl::Window &window, mgl::vec
             return mon;
     }
     return &win->monitors[0];
+}
+
+static const mgl_monitor* get_monitor_by_name(mgl::Window &window, const char *name) {
+    const mgl_window *win = window.internal_window();
+    for(int i = 0; i < win->num_monitors; ++i) {
+        const mgl_monitor *mon = &win->monitors[i];
+        if(strcmp(mon->name, name) == 0)
+            return mon;
+    }
+    return nullptr;
+}
+
+static void print_monitor_names(mgl::Window &window) {
+    const mgl_window *win = window.internal_window();
+    for(int i = 0; i < win->num_monitors; ++i) {
+        const mgl_monitor *mon = &win->monitors[i];
+        fprintf(stderr, "  %s\n", mon->name);
+    }
 }
 
 static bool window_has_atom(Display *dpy, Window window, Atom atom) {
@@ -494,6 +513,7 @@ int main(int argc, char **argv) {
         {"--icon", nullptr},
         {"--icon-color", nullptr},
         {"--bg-color", nullptr},
+        {"--monitor", nullptr},
     };
 
     for(int i = 1; i < argc; i += 2) {
@@ -516,6 +536,7 @@ int main(int argc, char **argv) {
     const char *icon_filepath = args["--icon"];
     const char *icon_color_str = args["--icon-color"];
     const char *bg_color_str = args["--bg-color"];
+    const char *monitor_str = args["--monitor"];
 
     if(!notification_text) {
         fprintf(stderr, "error: missing required option '--text'\n");
@@ -532,6 +553,9 @@ int main(int argc, char **argv) {
         fprintf(stderr, "error: expected timeout to be a floating point number, was: '%s'\n", timeout_str);
         usage();
     }
+
+    if(!monitor_str)
+        monitor_str = "auto";
 
     const mgl::Color icon_color = parse_hex_color(icon_color_str ? icon_color_str : "FFFFFF");
     const mgl::Color bg_color = parse_hex_color(bg_color_str ? bg_color_str : "76b900");
@@ -562,11 +586,21 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
-    // The cursor position is wrong on wayland if an x11 window is not focused. On wayland we instead create a window and get the position where the wayland compositor puts it
-    Window x11_cursor_window = None;
-    const mgl::vec2i cursor_position = get_cursor_position(display, &x11_cursor_window);
-    const mgl::vec2i monitor_position_query_value = (x11_cursor_window || !wayland) ? cursor_position : create_window_get_center_position(display);
-    const mgl_monitor *focused_monitor = find_monitor_at_position(window, monitor_position_query_value);
+    const mgl_monitor *focused_monitor = nullptr;
+    if(strcmp(monitor_str, "auto") == 0) {
+        // The cursor position is wrong on wayland if an x11 window is not focused. On wayland we instead create a window and get the position where the wayland compositor puts it
+        Window x11_cursor_window = None;
+        const mgl::vec2i cursor_position = get_cursor_position(display, &x11_cursor_window);
+        const mgl::vec2i monitor_position_query_value = (x11_cursor_window || !wayland) ? cursor_position : create_window_get_center_position(display);
+        focused_monitor = find_monitor_at_position(window, monitor_position_query_value);
+    } else {
+        focused_monitor = get_monitor_by_name(window, monitor_str);
+        if(!focused_monitor) {
+            fprintf(stderr, "Error: no monitor with the name \"%s\" was found. Expected one of:\n", monitor_str);
+            print_monitor_names(window);
+            exit(1);
+        }
+    }
 
     const std::string noto_sans_bold_filepath = resources_path + "fonts/NotoSans-Bold.ttf";
     mgl::MemoryMappedFile font_file;
@@ -746,8 +780,10 @@ int main(int argc, char **argv) {
         if(state_interpolation >= 1.0) {
             state_timer.restart();
             ++current_state_index;
-            if(current_state_index >= (int)states_to_execute_in_order.size())
+            if(current_state_index >= (int)states_to_execute_in_order.size()) {
                 window.close();
+                break;
+            }
         }
     }
 }
