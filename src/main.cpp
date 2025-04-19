@@ -575,6 +575,7 @@ int main(int argc, char **argv) {
     window_create_params.background_color = use_transparency ? mgl::Color(0, 0, 0, 0) : bg_color;
     window_create_params.hide_decorations = true;
     window_create_params.window_type = MGL_WINDOW_TYPE_NOTIFICATION;
+    window_create_params.graphics_api = MGL_GRAPHICS_API_GLX;
 
     mgl::Window window;
     if(!window.create("gsr notify", window_create_params))
@@ -623,7 +624,7 @@ int main(int argc, char **argv) {
         else if(icon_filepath_str == "screenshot")
             icon_filepath_str = resources_path + "images/screenshot.png";
 
-        if(!logo_texture.load_from_file(icon_filepath_str.c_str(), {false, false, true})) {
+        if(!logo_texture.load_from_file(icon_filepath_str.c_str(), {false, false, MGL_TEXTURE_SCALE_LINEAR_MIPMAP})) {
             fprintf(stderr, "Warning: failed to load icon\n");
         }
     }
@@ -648,10 +649,10 @@ int main(int argc, char **argv) {
     }
 
     unsigned char data = 1; // Prefer not being composed to not reduce display fps on AMD when an application is using 100% of GPU
-    XChangeProperty(display, window.get_system_handle(), XInternAtom(display, "_NET_WM_BYPASS_COMPOSITOR", False), XA_CARDINAL, 32, PropModeReplace, &data, 1);
+    XChangeProperty(display, (Window)window.get_system_handle(), XInternAtom(display, "_NET_WM_BYPASS_COMPOSITOR", False), XA_CARDINAL, 32, PropModeReplace, &data, 1);
 
     data = 1;
-    XChangeProperty(display, window.get_system_handle(), XInternAtom(display, "GAMESCOPE_EXTERNAL_OVERLAY", False), XA_CARDINAL, 32, PropModeReplace, &data, 1);
+    XChangeProperty(display, (Window)window.get_system_handle(), XInternAtom(display, "GAMESCOPE_EXTERNAL_OVERLAY", False), XA_CARDINAL, 32, PropModeReplace, &data, 1);
 
     // TODO: Make sure the notification always stays on top. Test with starting the notification and then opening youtube in fullscreen.
     const int window_width = content_padding_left + logo_sprite_padding_x + logo_sprite.get_size().x + padding_between_icon_and_text_x + text.get_bounds().size.x + logo_sprite_padding_x + padding_between_icon_and_text_x;
@@ -660,11 +661,11 @@ int main(int argc, char **argv) {
     window.set_size_limits(window_size, window_size);
     window.set_size(window_size);
     if(!use_transparency)
-        set_window_clip_region(display, window.get_system_handle(), {0, 0}, {0, 0});
+        set_window_clip_region(display, (Window)window.get_system_handle(), {0, 0}, {0, 0});
     window.set_position(window_start_position);
-    make_window_click_through(display, window.get_system_handle());
+    make_window_click_through(display, (Window)window.get_system_handle());
     window.set_visible(true);
-    make_window_sticky(display, window.get_system_handle());
+    make_window_sticky(display, (Window)window.get_system_handle());
 
     const int slide_window_start_x = focused_monitor->pos.x + focused_monitor->size.x;
     const int slide_window_end_x = focused_monitor->pos.x + focused_monitor->size.x - window_size.x;
@@ -724,7 +725,7 @@ int main(int argc, char **argv) {
                 if(use_transparency) {
                     transparency_bg.set_size(window_clip.floor().to_vec2f());
                 } else {
-                    set_window_clip_region(display, window.get_system_handle(), {window_size.x - window_clip.x, 0}, window_clip);
+                    set_window_clip_region(display, (Window)window.get_system_handle(), {window_size.x - window_clip.x, 0}, window_clip);
                     XFlush(display);
                 }
                 break;
@@ -755,7 +756,7 @@ int main(int argc, char **argv) {
                 if(use_transparency) {
                     transparency_bg.set_size(window_clip.floor().to_vec2f());
                 } else {
-                    set_window_clip_region(display, window.get_system_handle(), {window_size.x - window_clip.x, 0}, window_clip);
+                    set_window_clip_region(display, (Window)window.get_system_handle(), {window_size.x - window_clip.x, 0}, window_clip);
                     XFlush(display);
                 }
                 break;
