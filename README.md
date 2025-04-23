@@ -16,6 +16,7 @@ These are the dependencies needed to build GPU Screen Recorder Notification:
 
 * x11 (libx11, libxrandr, libxrender, libxext)
 * libglvnd (which provides libgl, libglx and libegl)
+* wayland (wayland-client, wayland-egl, wayland-scanner)
 
 # License
 This software is licensed under GPL3.0-only. Files under `fonts/` directory belong to the Noto Sans Google fonts project and they are licensed under `SIL Open Font License`.
