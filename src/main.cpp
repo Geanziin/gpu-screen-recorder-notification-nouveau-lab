@@ -646,7 +646,7 @@ int main(int argc, char **argv) {
         logo_sprite.set_color(mgl::Color(icon_color.r, icon_color.g, icon_color.b, 0));
         logo_sprite.set_height((int)(window_height * 0.4f));
         logo_sprite_padding_x = (int)((window_height - logo_sprite.get_size().y) * 0.4f);
-        padding_between_icon_and_text_x = (int)(logo_sprite_padding_x * 0.5f);
+        padding_between_icon_and_text_x = (int)(logo_sprite_padding_x * 0.7f);
     }
 
     unsigned char data = 1; // Prefer not being composed to not reduce display fps on AMD when an application is using 100% of GPU
