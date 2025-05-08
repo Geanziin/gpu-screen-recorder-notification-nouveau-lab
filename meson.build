@@ -1,4 +1,4 @@
-project('gsr-notify', ['cpp'], version : '1.0.6', default_options : ['warning_level=2'], subproject_dir : 'depends')
+project('gsr-notify', ['cpp'], version : '1.0.7', default_options : ['warning_level=2'], subproject_dir : 'depends')
 
 if get_option('buildtype') == 'debug'
     add_project_arguments('-g3', language : ['cpp'])

@@ -638,14 +638,15 @@ int main(int argc, char **argv) {
     text.set_color(mgl::Color(255, 255, 255, 0));
 
     mgl::Sprite logo_sprite;
-    float logo_sprite_padding_x = (int)(window_height * 0.5f);
+    float logo_sprite_padding_x = (int)(window_height * 0.4f);
     float padding_between_icon_and_text_x = 0.0f;
+    float padding_right_side = (int)(window_height * 0.4f);
     if(logo_texture.is_valid()) {
         logo_sprite.set_texture(&logo_texture);
         logo_sprite.set_color(mgl::Color(icon_color.r, icon_color.g, icon_color.b, 0));
         logo_sprite.set_height((int)(window_height * 0.4f));
         logo_sprite_padding_x = (int)((window_height - logo_sprite.get_size().y) * 0.4f);
-        padding_between_icon_and_text_x = (int)(logo_sprite_padding_x * 0.7f);
+        padding_between_icon_and_text_x = (int)(logo_sprite_padding_x * 0.5f);
     }
 
     unsigned char data = 1; // Prefer not being composed to not reduce display fps on AMD when an application is using 100% of GPU
@@ -655,7 +656,7 @@ int main(int argc, char **argv) {
     XChangeProperty(display, (Window)window.get_system_handle(), XInternAtom(display, "GAMESCOPE_EXTERNAL_OVERLAY", False), XA_CARDINAL, 32, PropModeReplace, &data, 1);
 
     // TODO: Make sure the notification always stays on top. Test with starting the notification and then opening youtube in fullscreen.
-    const int window_width = content_padding_left + logo_sprite_padding_x + logo_sprite.get_size().x + padding_between_icon_and_text_x + text.get_bounds().size.x + logo_sprite_padding_x + padding_between_icon_and_text_x;
+    const int window_width = content_padding_left + logo_sprite_padding_x + logo_sprite.get_size().x + padding_between_icon_and_text_x + text.get_bounds().size.x + padding_right_side;
     const mgl::vec2i window_size{window_width, window_height};
     const mgl::vec2i window_start_position{focused_monitor->pos.x + focused_monitor->size.x - window_size.x, focused_monitor->pos.y + window_size.y};
     window.set_size_limits(window_size, window_size);
@@ -704,7 +705,7 @@ int main(int argc, char **argv) {
     const auto slide_content_handler = [&](double interpolate_start, double interpolate_end, double interpolation) {
         double new_slide_x = interpolate(interpolate_start, interpolate_end, interpolation);
         content_bg.set_position(mgl::vec2f(new_slide_x, content_bg_start_position.y).floor());
-        logo_sprite.set_position((content_bg.get_position() + mgl::vec2f(logo_sprite_padding_x, content_bg.get_size().y * 0.5f - logo_sprite.get_size().y * 0.5f)).floor());
+        logo_sprite.set_position((content_bg.get_position() + mgl::vec2f(content_padding_left + logo_sprite_padding_x, content_bg.get_size().y * 0.5f - logo_sprite.get_size().y * 0.5f)).floor());
         const float content_space_left_pos_x = logo_sprite.get_position().x + logo_sprite.get_size().x + padding_between_icon_and_text_x;
         //const float content_space_left_x = content_bg.get_size().x - content_space_left_pos_x;
         text.set_position((mgl::vec2f(content_space_left_pos_x, content_bg.get_position().y) + mgl::vec2f(0.0f, content_bg.get_size().y) * 0.5f - mgl::vec2f(0.0f, text.get_bounds().size.y) * 0.5f).floor());
