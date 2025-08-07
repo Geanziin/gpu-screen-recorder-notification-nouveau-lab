@@ -629,13 +629,15 @@ int main(int argc, char **argv) {
         }
     }
 
+    mgl::Text text(notification_text, font);
+    text.set_color(mgl::Color(255, 255, 255, 0));
+
+    const int text_padding_vertical = font.get_character_size();
+
     const int window_height = focused_monitor->size.y / 13;
     float content_padding_left = (int)(window_height * 0.05f);
     if(content_padding_left < 2.0f)
         content_padding_left = 2.0f;
-
-    mgl::Text text(notification_text, font);
-    text.set_color(mgl::Color(255, 255, 255, 0));
 
     mgl::Sprite logo_sprite;
     float logo_sprite_padding_x = (int)(window_height * 0.4f);
@@ -657,8 +659,8 @@ int main(int argc, char **argv) {
 
     // TODO: Make sure the notification always stays on top. Test with starting the notification and then opening youtube in fullscreen.
     const int window_width = content_padding_left + logo_sprite_padding_x + logo_sprite.get_size().x + padding_between_icon_and_text_x + text.get_bounds().size.x + padding_right_side;
-    const mgl::vec2i window_size{window_width, window_height};
-    const mgl::vec2i window_start_position{focused_monitor->pos.x + focused_monitor->size.x - window_size.x, focused_monitor->pos.y + window_size.y};
+    const mgl::vec2i window_size{window_width, std::max(window_height, text_padding_vertical + (int)text.get_bounds().size.y + text_padding_vertical)};
+    const mgl::vec2i window_start_position{focused_monitor->pos.x + focused_monitor->size.x - window_size.x, focused_monitor->pos.y + focused_monitor->size.y / 13};
     window.set_size_limits(window_size, window_size);
     window.set_size(window_size);
     if(!use_transparency)

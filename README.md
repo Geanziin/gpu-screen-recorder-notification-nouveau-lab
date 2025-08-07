@@ -1,7 +1,6 @@
 # GPU Screen Recorder Notification
 Notification in the style of ShadowPlay.
 
-
 On X11 the notification shows on the monitor that the cursor is on. On Wayland the notification shows on the monitor the Wayland compositor considers focused.
 
 # Installation
