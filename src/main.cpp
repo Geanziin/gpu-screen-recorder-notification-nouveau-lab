@@ -16,6 +16,7 @@
 #include <assert.h>
 #include <unistd.h>
 #include <limits.h>
+#include <signal.h>
 #include <poll.h>
 
 #include <X11/Xlib.h>
@@ -118,6 +119,8 @@ static void usage() {
     fprintf(stderr, "  --icon-color  The color to display the icon as in hex format, for example FF0000. Optional, set to FFFFFF by default.\n");
     fprintf(stderr, "  --bg-color    The notification background (and side bar) color in hex format, for example FF0000. Optional, set to 76b900 by default.\n");
     fprintf(stderr, "  --monitor     The monitor to display the notification on. This is the name of the monitor as displayed by xrandr. This can be \"auto\", in which case the focused monitor is used. Optional, set to \"auto\" by default.\n");
+    fprintf(stderr, "notes:\n");
+    fprintf(stderr, "  Send signal SIGINT to gsr-notify (Ctrl+C, or pkill -SIGINT -f gsr-notify) to stop showing the notification.\n");
     fprintf(stderr, "examples:\n");
     fprintf(stderr, "  gsr-notify --text 'Recording has started' --timeout 3.0\n");
     fprintf(stderr, "  gsr-notify --text 'Recording has started' --timeout 3.0 --icon record\n");
@@ -487,8 +490,16 @@ static mgl::vec2i create_window_get_center_position(Display *display) {
     return pos;
 }
 
+static sig_atomic_t running = 1;
+static void sigint_handler(int signal) {
+    (void)signal;
+    running = 0;
+}
+
 int main(int argc, char **argv) {
     setlocale(LC_ALL, "C"); // Sigh... stupid C
+    signal(SIGINT, sigint_handler);
+    signal(SIGTERM, sigint_handler);
 
     std::string resources_path;
     if(access("sibs-build/linux_x86_64/debug/gsr-notify", F_OK) == 0) {
@@ -714,7 +725,7 @@ int main(int argc, char **argv) {
     };
 
     mgl::Event event;
-    while(window.is_open()) {
+    while(window.is_open() && running) {
         while(window.poll_event(event)) {}
 
         const StateWithPayload current_state = states_to_execute_in_order[current_state_index];
