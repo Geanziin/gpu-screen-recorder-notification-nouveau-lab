@@ -780,6 +780,11 @@ int main(int argc, char **argv) {
             }
         }
 
+        if(current_state.state == State::PAUSE && state_interpolation < 1.0) {
+            usleep(30 * 1000);
+            continue;
+        }
+
         if(use_transparency) {
             window.clear(mgl::Color(0, 0, 0, 0));
             transparency_bg.set_position(mgl::vec2f(window_size.x - transparency_bg.get_size().x, 0.0f));
