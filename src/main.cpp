@@ -111,21 +111,24 @@ static bool is_xwayland(Display *display) {
 }
 
 static void usage() {
-    fprintf(stderr, "usage: gsr-notify --text text --timeout timeout [--icon filepath] [--icon-color color] [--bg-color color] [--monitor monitor]\n");
-    fprintf(stderr, "options:\n");
+    fprintf(stderr, "Usage: gsr-notify --text text --timeout timeout [--icon filepath] [--icon-color color] [--bg-color color] [--monitor monitor]\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "Options:\n");
     fprintf(stderr, "  --text        The text to display in the notification. Required.\n");
     fprintf(stderr, "  --timeout     The time to display the notification in seconds (excluding animation time), expected to be a floating point number. Required.\n");
     fprintf(stderr, "  --icon        A path to an image file to display on the left side of the text. This can also be either \"record\", \"replay\", \"stream\" or \"screenshot\" to use built-in images. Optional.\n");
     fprintf(stderr, "  --icon-color  The color to display the icon as in hex format, for example FF0000. Optional, set to FFFFFF by default.\n");
     fprintf(stderr, "  --bg-color    The notification background (and side bar) color in hex format, for example FF0000. Optional, set to 76b900 by default.\n");
     fprintf(stderr, "  --monitor     The monitor to display the notification on. This is the name of the monitor as displayed by xrandr. This can be \"auto\", in which case the focused monitor is used. Optional, set to \"auto\" by default.\n");
-    fprintf(stderr, "notes:\n");
-    fprintf(stderr, "  Send signal SIGINT to gsr-notify (Ctrl+C, or pkill -SIGINT -f gsr-notify) to stop showing the notification.\n");
-    fprintf(stderr, "examples:\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "Notes:\n");
+    fprintf(stderr, "  Send signal SIGINT to gsr-notify (Ctrl+C, or pkill -SIGINT -f gsr-notify) to stop showing the notification before it stops showing by itself.\n");
+    fprintf(stderr, "\n");
+    fprintf(stderr, "Examples:\n");
     fprintf(stderr, "  gsr-notify --text 'Recording has started' --timeout 3.0\n");
     fprintf(stderr, "  gsr-notify --text 'Recording has started' --timeout 3.0 --icon record\n");
-    fprintf(stderr, "  gsr-notify --text 'Recording has started' --timeout 3.0 --icon '/usr/share/gpu-screen-recorder/images/record.png'\n");
-    fprintf(stderr, "  gsr-notify --text 'Recording has started' --timeout 3.0 --icon '/usr/share/gpu-screen-recorder/images/record.png' --icon-color FF0000\n");
+    fprintf(stderr, "  gsr-notify --text 'Recording has started' --timeout 3.0 --icon '/usr/share/gsr-notify/images/record.png'\n");
+    fprintf(stderr, "  gsr-notify --text 'Recording has started' --timeout 3.0 --icon '/usr/share/gsr-notify/images/record.png' --bg-color FF0000 --icon-color FF0000\n");
     exit(1);
 }
 
