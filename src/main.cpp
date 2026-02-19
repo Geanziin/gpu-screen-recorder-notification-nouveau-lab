@@ -590,6 +590,7 @@ int main(int argc, char **argv) {
     window_create_params.hide_decorations = true;
     window_create_params.window_type = MGL_WINDOW_TYPE_NOTIFICATION;
     window_create_params.graphics_api = MGL_GRAPHICS_API_GLX;
+    window_create_params.class_name = "gsr-notify";
 
     mgl::Window window;
     if(!window.create("gsr notify", window_create_params))
