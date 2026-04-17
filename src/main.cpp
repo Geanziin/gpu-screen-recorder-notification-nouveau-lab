@@ -4,7 +4,6 @@
 #include <mglpp/system/Clock.hpp>
 #include <mglpp/graphics/Rectangle.hpp>
 #include <mglpp/system/MemoryMappedFile.hpp>
-#include <mglpp/graphics/Font.hpp>
 #include <mglpp/graphics/Text.hpp>
 #include <mglpp/graphics/Texture.hpp>
 #include <mglpp/graphics/Sprite.hpp>
@@ -618,15 +617,6 @@ int main(int argc, char **argv) {
         }
     }
 
-    const std::string noto_sans_bold_filepath = resources_path + "fonts/NotoSans-Bold.ttf";
-    mgl::MemoryMappedFile font_file;
-    if(!font_file.load(noto_sans_bold_filepath.c_str(), mgl::MemoryMappedFile::LoadOptions{true, false}))
-        return 1;
-
-    mgl::Font font;
-    if(!font.load_from_file(font_file, focused_monitor->size.y / 60))
-        return 1;
-
     mgl::Texture logo_texture;
     if(icon_filepath) {
         std::string icon_filepath_str = icon_filepath;
@@ -644,10 +634,14 @@ int main(int argc, char **argv) {
         }
     }
 
-    mgl::Text text(notification_text, font);
-    text.set_color(mgl::Color(255, 255, 255, 0));
+    char font_desc[64];
+    snprintf(font_desc, sizeof(font_desc), "Noto Sans Bold %d", (int)(focused_monitor->size.y / 60.0 / 1.8));
 
-    const int text_padding_vertical = font.get_character_size();
+    mgl::Text text(notification_text, font_desc);
+    text.set_color(mgl::Color(255, 255, 255, 0));
+    text.set_wrap_width(focused_monitor->size.x / 5);
+
+    const int text_padding_vertical = text.get_font_size();
 
     const int window_height = focused_monitor->size.y / 13;
     float content_padding_left = (int)(window_height * 0.05f);

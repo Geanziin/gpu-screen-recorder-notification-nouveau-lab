@@ -1,4 +1,4 @@
-project('gsr-notify', ['cpp'], version : '1.1.1', default_options : ['warning_level=2'], subproject_dir : 'depends')
+project('gsr-notify', ['cpp'], version : '1.2.0', default_options : ['warning_level=2'], subproject_dir : 'depends')
 
 if get_option('buildtype') == 'debug'
     add_project_arguments('-g3', language : ['cpp'])
@@ -31,4 +31,3 @@ executable(
 )
 
 install_subdir('images', install_dir : gsr_notify_resources_path)
-install_subdir('fonts', install_dir : gsr_notify_resources_path)
