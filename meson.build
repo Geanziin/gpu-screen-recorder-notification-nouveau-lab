@@ -10,7 +10,7 @@ src = [
     'src/main.cpp',
 ]
 
-mglpp_proj = subproject('mglpp')
+mglpp_proj = subproject('mglpp', default_options : ['wayland=false'])
 mglpp_dep = mglpp_proj.get_variable('mglpp_dep')
 
 dep = [
