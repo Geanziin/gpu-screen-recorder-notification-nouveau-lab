@@ -634,8 +634,12 @@ int main(int argc, char **argv) {
         }
     }
 
-    char font_desc[64];
-    snprintf(font_desc, sizeof(font_desc), "Noto Sans Bold %d", (int)(focused_monitor->size.y / 60.0 / 1.8));
+    std::string default_font_name = mgl::Text::get_default_font_name();
+    if(default_font_name.empty())
+        default_font_name = "Sans";
+
+    char font_desc[128];
+    snprintf(font_desc, sizeof(font_desc), "%s Bold %d", default_font_name.c_str(), (int)(focused_monitor->size.y / 60.0 / 1.8));
 
     mgl::Text text(notification_text, font_desc);
     text.set_color(mgl::Color(255, 255, 255, 0));
