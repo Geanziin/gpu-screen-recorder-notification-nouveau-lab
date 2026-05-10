@@ -1,3 +1,4 @@
+#include "../include/WaylandHostBridge.hpp"
 #include <mglpp/mglpp.hpp>
 #include <mglpp/window/Window.hpp>
 #include <mglpp/window/Event.hpp>
@@ -21,6 +22,7 @@
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #include <X11/extensions/shape.h>
+#include <wayland-client.h>
 
 extern "C" {
 #include <mgl/mgl.h>
@@ -40,6 +42,17 @@ struct StateWithPayload {
     State state;
     double time_in_state_sec;
 };
+
+static int mgl_x_error_handler(Display *display, XErrorEvent *ee) {
+    (void)display;
+    (void)ee;
+    return 0;
+}
+
+static int mgl_x_io_error_handler(Display *display) {
+    (void)display;
+    return 0;
+}
 
 // Linear interpolation
 static double interpolate(double a, double b, double interpolation) {
@@ -191,6 +204,14 @@ static void print_monitor_names(mgl::Window &window) {
         const mgl_monitor *mon = &win->monitors[i];
         fprintf(stderr, "  %s\n", mon->name);
     }
+}
+
+static const gsr::WaylandMonitor* get_wayland_monitor_by_name(const std::vector<gsr::WaylandMonitor> &monitors, std::string_view name) {
+    for(const auto &monitor : monitors) {
+        if(monitor.name == name)
+            return &monitor;
+    }
+    return nullptr;
 }
 
 static bool window_has_atom(Display *dpy, Window window, Atom atom) {
@@ -492,6 +513,20 @@ static mgl::vec2i create_window_get_center_position(Display *display) {
     return pos;
 }
 
+static bool is_wayland_layer_shell_overlay_session() {
+    const char *wayland_display = getenv("WAYLAND_DISPLAY");
+    if(!wayland_display || !wayland_display[0])
+        return false;
+
+    const char *xdg_current_desktop = getenv("XDG_CURRENT_DESKTOP");
+    if(!xdg_current_desktop || !xdg_current_desktop[0])
+        return false;
+
+    return strstr(xdg_current_desktop, "Hyprland") ||
+            strstr(xdg_current_desktop, "niri") ||
+            strstr(xdg_current_desktop, "river");
+}
+
 static sig_atomic_t running = 1;
 static void sigint_handler(int signal) {
     (void)signal;
@@ -573,10 +608,77 @@ int main(int argc, char **argv) {
     const mgl::Color icon_color = parse_hex_color(icon_color_str ? icon_color_str : "FFFFFF");
     const mgl::Color bg_color = parse_hex_color(bg_color_str ? bg_color_str : "76b900");
 
-    mgl::Init init;
-    Display *display = (Display*)mgl_get_context()->connection;
+    // Open the Wayland display ourselves (so we can route through the flatpak
+    // host bridge) and lend it to mgl. Owned and disconnected by main(), see
+    // the bottom of this function.
+    struct wl_display *wayland_dpy = nullptr;
+    if(getenv("WAYLAND_DISPLAY"))
+        wayland_dpy = gsr::wayland_connect_to_host();
+
+    const mgl_window_system mgl_backend = is_wayland_layer_shell_overlay_session()
+        ? MGL_WINDOW_SYSTEM_WAYLAND
+        : MGL_WINDOW_SYSTEM_X11;
+    const bool wayland_native_overlay = mgl_backend == MGL_WINDOW_SYSTEM_WAYLAND;
+
+    // For the wlr-layer-shell path we need to know the target output before
+    // creating the surface so the compositor pins it to the right monitor and
+    // we can size/margin everything against that monitor's height.
+    //
+    // monitor_size is intentionally the mode (pixel) size, not the logical
+    // size: mgl renders in buffer pixels (self->size, GL viewport) and all the
+    // layout math here flows into those buffer-pixel coordinates. The logical
+    // size is only needed for the layer-shell margin (which the protocol
+    // specifies in logical pixels).
+    mgl::vec2i monitor_size{0, 0};
+    mgl::vec2i monitor_pos{0, 0};
+    mgl::vec2i monitor_logical_size{0, 0};
+    std::string selected_monitor_name;
+    if(wayland_native_overlay && wayland_dpy) {
+        const std::vector<gsr::WaylandMonitor> monitors = gsr::wayland_get_monitors(wayland_dpy);
+        if(monitors.empty()) {
+            fprintf(stderr, "Error: no Wayland monitors found\n");
+            wl_display_disconnect(wayland_dpy);
+            return 1;
+        }
+
+        const gsr::WaylandMonitor *selected = nullptr;
+        if(strcmp(monitor_str, "auto") == 0) {
+            selected = &monitors[0];
+        } else {
+            selected = get_wayland_monitor_by_name(monitors, monitor_str);
+            if(!selected) {
+                fprintf(stderr, "Error: no monitor with the name \"%s\" was found. Expected one of:\n", monitor_str);
+                for(const gsr::WaylandMonitor &m : monitors)
+                    fprintf(stderr, "  %s\n", m.name.c_str());
+                wl_display_disconnect(wayland_dpy);
+                return 1;
+            }
+        }
+
+        monitor_size = { selected->width, selected->height };
+        monitor_logical_size = { selected->logical_width, selected->logical_height };
+        selected_monitor_name = selected->name;
+    }
+
+    const int mgl_init_result = (mgl_backend == MGL_WINDOW_SYSTEM_WAYLAND && wayland_dpy)
+        ? mgl_init_with_wayland_display(wayland_dpy)
+        : mgl_init(mgl_backend);
+    if(mgl_init_result != 0) {
+        fprintf(stderr, "Error: failed to initialize mgl. Failed to connect to the %s server or set up opengl\n",
+            mgl_backend == MGL_WINDOW_SYSTEM_WAYLAND ? "Wayland" : "X11");
+        if(wayland_dpy)
+            wl_display_disconnect(wayland_dpy);
+        return 1;
+    }
+
+    const bool use_transparency = wayland_native_overlay;
+    Display *display = wayland_native_overlay ? XOpenDisplay(NULL) : (Display*)mgl_get_context()->connection;
     const bool wayland = is_xwayland(display);
-    const bool use_transparency = wayland;
+
+    if(display && mgl_get_context()->display_server_is_wayland) {
+        XSetErrorHandler(mgl_x_error_handler);
+        XSetIOErrorHandler(mgl_x_io_error_handler);
+    }
 
     mgl::Window::CreateParams window_create_params;
     window_create_params.size = { 32, 32 };
@@ -588,33 +690,52 @@ int main(int argc, char **argv) {
     window_create_params.background_color = use_transparency ? mgl::Color(0, 0, 0, 0) : bg_color;
     window_create_params.hide_decorations = true;
     window_create_params.window_type = MGL_WINDOW_TYPE_NOTIFICATION;
-    window_create_params.graphics_api = MGL_GRAPHICS_API_GLX;
     window_create_params.class_name = "gsr-notify";
+
+    if(wayland_native_overlay) {
+        window_create_params.graphics_api = MGL_GRAPHICS_API_EGL;
+        window_create_params.window_type = MGL_WINDOW_TYPE_OVERLAY;
+        window_create_params.layer_shell_options.keyboard_interactivity = MGL_LAYER_SHELL_KEYBOARD_INTERACTIVITY_NONE;
+        window_create_params.layer_shell_options.exclusive_zone = -1;
+        window_create_params.layer_shell_options.anchor = MGL_LAYER_SHELL_ANCHOR_TOP | MGL_LAYER_SHELL_ANCHOR_RIGHT;
+        // Layer-shell margins are in logical pixels, so derive from logical
+        // height — otherwise on a 2.0-scale monitor the margin doubles.
+        window_create_params.layer_shell_options.margin_top = monitor_logical_size.y / 13;
+        window_create_params.layer_shell_options.output_name = selected_monitor_name.c_str();
+    } else {
+        window_create_params.graphics_api = MGL_GRAPHICS_API_GLX;
+        window_create_params.window_type = MGL_WINDOW_TYPE_NOTIFICATION;
+    }
 
     mgl::Window window;
     if(!window.create("gsr notify", window_create_params))
         return 1;
 
-    const mgl_window *win = window.internal_window();
-    if(win->num_monitors == 0) {
-        fprintf(stderr, "Error: no monitors found\n");
-        exit(1);
-    }
-
-    const mgl_monitor *focused_monitor = nullptr;
-    if(strcmp(monitor_str, "auto") == 0) {
-        // The cursor position is wrong on wayland if an x11 window is not focused. On wayland we instead create a window and get the position where the wayland compositor puts it
-        Window x11_cursor_window = None;
-        const mgl::vec2i cursor_position = get_cursor_position(display, &x11_cursor_window);
-        const mgl::vec2i monitor_position_query_value = (x11_cursor_window || !wayland) ? cursor_position : create_window_get_center_position(display);
-        focused_monitor = find_monitor_at_position(window, monitor_position_query_value);
-    } else {
-        focused_monitor = get_monitor_by_name(window, monitor_str);
-        if(!focused_monitor) {
-            fprintf(stderr, "Error: no monitor with the name \"%s\" was found. Expected one of:\n", monitor_str);
-            print_monitor_names(window);
+    if(!wayland_native_overlay) {
+        const mgl_window *win = window.internal_window();
+        if(win->num_monitors == 0) {
+            fprintf(stderr, "Error: no monitors found\n");
             exit(1);
         }
+
+        const mgl_monitor *focused_monitor = nullptr;
+        if(strcmp(monitor_str, "auto") == 0) {
+            // The cursor position is wrong on wayland if an x11 window is not focused. On wayland we instead create a window and get the position where the wayland compositor puts it
+            Window x11_cursor_window = None;
+            const mgl::vec2i cursor_position = get_cursor_position(display, &x11_cursor_window);
+            const mgl::vec2i monitor_position_query_value = (x11_cursor_window || !wayland) ? cursor_position : create_window_get_center_position(display);
+            focused_monitor = find_monitor_at_position(window, monitor_position_query_value);
+        } else {
+            focused_monitor = get_monitor_by_name(window, monitor_str);
+            if(!focused_monitor) {
+                fprintf(stderr, "Error: no monitor with the name \"%s\" was found. Expected one of:\n", monitor_str);
+                print_monitor_names(window);
+                exit(1);
+            }
+        }
+
+        monitor_size = { focused_monitor->size.x, focused_monitor->size.y };
+        monitor_pos = { focused_monitor->pos.x, focused_monitor->pos.y };
     }
 
     mgl::Texture logo_texture;
@@ -639,15 +760,15 @@ int main(int argc, char **argv) {
         default_font_name = "Sans";
 
     char font_desc[128];
-    snprintf(font_desc, sizeof(font_desc), "%s Bold %d", default_font_name.c_str(), (int)(focused_monitor->size.y / 60.0 / 1.8));
+    snprintf(font_desc, sizeof(font_desc), "%s Bold %d", default_font_name.c_str(), (int)(monitor_size.y / 60.0 / 1.8));
 
     mgl::Text text(notification_text, font_desc);
     text.set_color(mgl::Color(255, 255, 255, 0));
-    text.set_wrap_width(focused_monitor->size.x / 5);
+    text.set_wrap_width(monitor_size.x / 5);
 
     const int text_padding_vertical = text.get_font_size();
 
-    const int window_height = focused_monitor->size.y / 13;
+    const int window_height = monitor_size.y / 13;
     float content_padding_left = (int)(window_height * 0.05f);
     if(content_padding_left < 2.0f)
         content_padding_left = 2.0f;
@@ -664,27 +785,32 @@ int main(int argc, char **argv) {
         padding_between_icon_and_text_x = (int)(logo_sprite_padding_x * 0.7f);
     }
 
-    unsigned char data = 1; // Prefer not being composed to not reduce display fps on AMD when an application is using 100% of GPU
-    XChangeProperty(display, (Window)window.get_system_handle(), XInternAtom(display, "_NET_WM_BYPASS_COMPOSITOR", False), XA_CARDINAL, 32, PropModeReplace, &data, 1);
+    if(!wayland_native_overlay) {
+        unsigned char data = 1; // Prefer not being composed to not reduce display fps on AMD when an application is using 100% of GPU
+        XChangeProperty(display, (Window)window.get_system_handle(), XInternAtom(display, "_NET_WM_BYPASS_COMPOSITOR", False), XA_CARDINAL, 32, PropModeReplace, &data, 1);
 
-    data = 1;
-    XChangeProperty(display, (Window)window.get_system_handle(), XInternAtom(display, "GAMESCOPE_EXTERNAL_OVERLAY", False), XA_CARDINAL, 32, PropModeReplace, &data, 1);
+        data = 1;
+        XChangeProperty(display, (Window)window.get_system_handle(), XInternAtom(display, "GAMESCOPE_EXTERNAL_OVERLAY", False), XA_CARDINAL, 32, PropModeReplace, &data, 1);
+    }
 
     // TODO: Make sure the notification always stays on top. Test with starting the notification and then opening youtube in fullscreen.
     const int window_width = content_padding_left + logo_sprite_padding_x + logo_sprite.get_size().x + padding_between_icon_and_text_x + text.get_bounds().size.x + padding_right_side;
     const mgl::vec2i window_size{window_width, std::max(window_height, text_padding_vertical + (int)text.get_bounds().size.y + text_padding_vertical)};
-    const mgl::vec2i window_start_position{focused_monitor->pos.x + focused_monitor->size.x - window_size.x, focused_monitor->pos.y + focused_monitor->size.y / 13};
+    const mgl::vec2i window_start_position{monitor_pos.x + monitor_size.x - window_size.x, monitor_pos.y + monitor_size.y / 13};
     window.set_size_limits(window_size, window_size);
     window.set_size(window_size);
-    if(!use_transparency)
-        set_window_clip_region(display, (Window)window.get_system_handle(), {0, 0}, {0, 0});
-    window.set_position(window_start_position);
-    make_window_click_through(display, (Window)window.get_system_handle());
-    window.set_visible(true);
-    make_window_sticky(display, (Window)window.get_system_handle());
 
-    const int slide_window_start_x = focused_monitor->pos.x + focused_monitor->size.x;
-    const int slide_window_end_x = focused_monitor->pos.x + focused_monitor->size.x - window_size.x;
+    if(!wayland_native_overlay) {
+        if(!use_transparency)
+            set_window_clip_region(display, (Window)window.get_system_handle(), {0, 0}, {0, 0});
+        window.set_position(window_start_position);
+        make_window_click_through(display, (Window)window.get_system_handle());
+        window.set_visible(true);
+        make_window_sticky(display, (Window)window.get_system_handle());
+    }
+
+    const int slide_window_start_x = monitor_pos.x + monitor_size.x;
+    const int slide_window_end_x = monitor_pos.x + monitor_size.x - window_size.x;
 
     const std::array<StateWithPayload, 9> states_to_execute_in_order = {
         StateWithPayload{State::SLIDE_IN_WINDOW,   0.15},
@@ -808,4 +934,6 @@ int main(int argc, char **argv) {
             }
         }
     }
+
+    //mgl_deinit();
 }

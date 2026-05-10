@@ -1,4 +1,4 @@
-project('gsr-notify', ['cpp'], version : '1.2.3', default_options : ['warning_level=2'], subproject_dir : 'depends')
+project('gsr-notify', ['c', 'cpp'], version : '1.2.3', default_options : ['warning_level=2'], subproject_dir : 'depends')
 
 if get_option('buildtype') == 'debug'
     add_project_arguments('-g3', language : ['cpp'])
@@ -7,10 +7,14 @@ elif get_option('buildtype') == 'release'
 endif
 
 src = [
+    'src/WaylandHostBridge.cpp',
     'src/main.cpp',
 ]
 
-mglpp_proj = subproject('mglpp', default_options : ['wayland=false'])
+subdir('protocol')
+src += protocol_src
+
+mglpp_proj = subproject('mglpp', default_options : ['wayland=true'])
 mglpp_dep = mglpp_proj.get_variable('mglpp_dep')
 
 dep = [
