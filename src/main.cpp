@@ -43,17 +43,6 @@ struct StateWithPayload {
     double time_in_state_sec;
 };
 
-static int mgl_x_error_handler(Display *display, XErrorEvent *ee) {
-    (void)display;
-    (void)ee;
-    return 0;
-}
-
-static int mgl_x_io_error_handler(Display *display) {
-    (void)display;
-    return 0;
-}
-
 // Linear interpolation
 static double interpolate(double a, double b, double interpolation) {
     return a + (b - a) * interpolation;
@@ -672,13 +661,8 @@ int main(int argc, char **argv) {
     }
 
     const bool use_transparency = wayland_native_overlay;
-    Display *display = wayland_native_overlay ? XOpenDisplay(NULL) : (Display*)mgl_get_context()->connection;
-    const bool wayland = is_xwayland(display);
-
-    if(display && mgl_get_context()->display_server_is_wayland) {
-        XSetErrorHandler(mgl_x_error_handler);
-        XSetIOErrorHandler(mgl_x_io_error_handler);
-    }
+    Display *display = wayland_native_overlay ? nullptr : (Display*)mgl_get_context()->connection;
+    const bool wayland = wayland_native_overlay || is_xwayland(display);
 
     mgl::Window::CreateParams window_create_params;
     window_create_params.size = { 32, 32 };
