@@ -14,8 +14,8 @@ GPU Screen Recorder overlay uses meson build system so you need to install `meso
 These are the dependencies needed to build GPU Screen Recorder Notification:
 
 * x11 (libx11, libxrandr, libxrender, libxext)
-* libglvnd (which provides libgl, libglx and libegl)
 * wayland (wayland-client, wayland-egl, wayland-scanner)
+* libglvnd (which provides libgl, libglx and libegl)
 * libpango (pangoft2)
 
 # License

@@ -1,4 +1,4 @@
-project('gsr-notify', ['c', 'cpp'], version : '1.2.3', default_options : ['warning_level=2'], subproject_dir : 'depends')
+project('gsr-notify', ['c', 'cpp'], version : '1.3.0', default_options : ['warning_level=2'], subproject_dir : 'depends')
 
 if get_option('buildtype') == 'debug'
     add_project_arguments('-g3', language : ['cpp'])
@@ -20,6 +20,7 @@ mglpp_dep = mglpp_proj.get_variable('mglpp_dep')
 dep = [
     mglpp_dep,
     dependency('xext'),
+    dependency('wayland-client'),
 ]
 
 prefix = get_option('prefix')
