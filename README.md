@@ -15,6 +15,7 @@ These are the dependencies needed to build GPU Screen Recorder Notification:
 
 * x11 (libx11, libxrandr, libxrender, libxext)
 * wayland (wayland-client, wayland-egl, wayland-scanner)
+* libxkbcommon
 * libglvnd (which provides libgl, libglx and libegl)
 * libpango (pangoft2)
 
