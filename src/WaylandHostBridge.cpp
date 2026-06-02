@@ -46,6 +46,8 @@ namespace gsr {
     }
 
     static wl_display* connect_via_bridge() {
+        const char *wayland_display = getenv("WAYLAND_DISPLAY");
+
         int sv[2];
         if(socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, sv) != 0) {
             perror("WaylandHostBridge: socketpair");
@@ -73,7 +75,7 @@ namespace gsr {
             char forward_fd_arg[32];
             snprintf(forward_fd_arg, sizeof(forward_fd_arg), "--forward-fd=%d", GSR_UI_UNIX_SOCKET_DOMAIN_FD);
 
-            execlp("flatpak-spawn", "flatpak-spawn", "--host", forward_fd_arg, bridge_host_path, (char*)nullptr);
+            execlp("flatpak-spawn", "flatpak-spawn", "--host", forward_fd_arg, bridge_host_path, wayland_display, (char*)nullptr);
             _exit(127);
         }
 
