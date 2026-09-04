@@ -10,12 +10,14 @@
 #include <mglpp/graphics/Sprite.hpp>
 
 #include <stdio.h>
+#include <stdlib.h> // exit and getenv
 #include <string.h>
 #include <array>
 #include <map>
 #include <assert.h>
 #include <unistd.h>
 #include <limits.h>
+#include <locale.h> // setlocale
 #include <signal.h>
 #include <poll.h>
 
